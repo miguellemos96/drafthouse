@@ -72,6 +72,27 @@ describe('parseDimensions', () => {
     expect(parseDimensions(`Ancho: 80${String.fromCharCode(0xa0)}cm`)).toEqual({ width: 80 })
   })
 
+  it('lets a plain label beat a qualified sequence', () => {
+    expect(parseDimensions('Seat: W 50 x D 50 x H 45 cm\nWidth: 210 cm, Depth: 95 cm, Height: 83 cm')).toEqual({ width: 210, depth: 95, height: 83 })
+    expect(parseDimensions('Seat height: W 50 x D 50 x H 45 cm\nHeight: 83 cm')).toEqual({ height: 83 })
+  })
+
+  it('ignores package sizes but reads headed item sizes', () => {
+    expect(parseDimensions('Package dimensions: 100 x 60 x 50 cm\nW 210 x D 95 x H 83 cm')).toEqual({ width: 210, depth: 95, height: 83 })
+    expect(parseDimensions('Dimensões do produto: L 80 x P 40 x A 75 cm')).toEqual({ width: 80, depth: 40, height: 75 })
+    expect(parseDimensions('Medidas: 160 x 230 cm')).toEqual({ unlabeled: [160, 230] })
+    expect(parseDimensions('Weighs 12 kg. W 210 x D 95 x H 83 cm')).toEqual({ width: 210, depth: 95, height: 83 })
+  })
+
+  it('reads a plain label after a qualified one on the same line', () => {
+    expect(parseDimensions('Seat height: 45 cm Height: 83 cm')).toEqual({ height: 83 })
+  })
+
+  it('does not read area or volume units as lengths', () => {
+    expect(parseDimensions('Height: 83 m2')).toEqual({})
+    expect(parseDimensions('Width: 3 m²')).toEqual({})
+  })
+
   it('ignores number sequences without a unit', () => {
     expect(parseDimensions('Available in 3 colours, 2 x 4 packs')).toEqual({})
   })
