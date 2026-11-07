@@ -1,0 +1,10 @@
+{
+  "$comment": "Copy to %USERPROFILE%\\.factory\\config.json. Read by scripts/factory/next-step.mjs and the factory-tick skill.",
+  "start": "21:00",
+  "cutoff": "03:00",
+  "branchPrefix": "factory/",
+  "maxFixRounds": 2,
+  "maxInconclusive": 2,
+  "logIssue": 1,
+  "autoMerge": false
+}
