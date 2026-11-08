@@ -18,6 +18,7 @@
     "node": ">=24"
   },
   "dependencies": {
+    "node-html-parser": "9.0.5",
     "three": "^0.187.0"
   },
   "devDependencies": {
