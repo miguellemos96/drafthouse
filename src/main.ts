@@ -2,6 +2,12 @@
 // Rooms, items and panels are added issue by issue (see docs/spec.md).
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
+import { loadLanguage } from './i18n/index.ts'
+import { applyLanguage, mountLanguageSwitcher } from './ui/language-switcher.ts'
+
+loadLanguage(navigator.languages)
+applyLanguage()
+mountLanguageSwitcher(document.body, applyLanguage)
 
 const container = document.getElementById('view')!
 const renderer = new THREE.WebGLRenderer({ antialias: true })
