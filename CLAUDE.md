@@ -15,7 +15,8 @@ Run from the repo root. Node 24 or later.
 - Factory script tests: `npm run test:factory`
 - Build the site: `npm run build`
 - All of the above: `npm run check`
-- Dev server: `npm run dev`. It doesn't exit, so never run it in the foreground of an unattended session; use the end-to-end tests to see the app instead (once they exist).
+- End-to-end tests: `npm run e2e` (Playwright, Chromium only, `e2e/*.spec.ts`). It builds the site and serves it with `vite preview` by itself, and saves a screenshot of the app to `test-results/app.png`. First time on a machine: `npx playwright install chromium`. For visible changes, put that screenshot in the PR's Evidence section.
+- Dev server: `npm run dev`. It doesn't exit, so never run it in the foreground of an unattended session; use the end-to-end tests to see the app instead.
 
 ## Code layout
 
@@ -33,7 +34,7 @@ Run from the repo root. Node 24 or later.
 - Bugs: write a failing test first. Features: turn the issue's acceptance scenarios into tests.
 - Never weaken or delete an existing test to make a change pass.
 - An issue that says "Blocked by #N" waits until #N is merged. If you find it on `main` without its blocker, park.
-- For anything visible, put evidence in the PR: test output, and a screenshot once Playwright exists. A human judges how the 3D view looks.
+- For anything visible, put evidence in the PR: test output, and the screenshot from `npm run e2e`. A human judges how the 3D view looks.
 - Scratch files go in `.factory-tmp/` (gitignored).
 - Imports use the `.ts` extension. Only erasable TypeScript syntax (no enums, no namespaces, no parameter properties), so the server runs without a build.
 - Factory internals live in `.claude/skills/` (worker, verifier, factory-tick), `.claude/hooks/` and `scripts/factory/`. Change them only through an issue labeled `human`; the factory does not edit its own machinery.

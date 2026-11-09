@@ -12,5 +12,5 @@
     "skipLibCheck": true,
     "types": ["node", "vite/client"]
   },
-  "include": ["src/**/*.ts", "server/**/*.ts", "*.config.ts"]
+  "include": ["src/**/*.ts", "server/**/*.ts", "*.config.ts", "e2e/**/*.ts"]
 }
