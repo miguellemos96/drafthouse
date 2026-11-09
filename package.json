@@ -12,7 +12,8 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:factory": "node --test scripts/factory/next-step.test.mjs",
-    "check": "npm run typecheck && npm run lint && npm test && npm run test:factory && npm run build"
+    "check": "npm run typecheck && npm run lint && npm test && npm run test:factory && npm run build",
+    "e2e": "playwright test"
   },
   "engines": {
     "node": ">=24"
@@ -23,6 +24,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.65.0",
     "@types/node": "^26.6.6",
     "@types/three": "^0.187.0",
     "eslint": "^10.14.0",
