@@ -41,6 +41,7 @@ export const extractProduct = (html: string, pageUrl: string): Product => {
 
   for (const item of jsonLdProducts(root)) fill(fromJsonLd(item))
   fill(fromMeta(root))
+  fill(fromPage(root))
 
   if (SIZE_FIELDS.some((f) => product[f] === undefined)) {
     const { unlabeled, ...sized } = parseDimensions(visibleText(root))
@@ -152,18 +153,46 @@ const fromMeta = (root: HTMLElement): Partial<Product> => {
     return undefined
   }
   return {
-    name: meta('og:title'),
+    name: meta('og:title') ?? pageTitle(meta('title')),
     price: number(meta('product:price:amount')),
     currency: meta('product:price:currency'),
     photoUrl: meta('og:image'),
   }
 }
 
+// ── Page title and visible price ────────────────────────────────────
+
+/**
+ * Amazon has no og:title, and its titles end in " : Amazon.es: Home & Kitchen".
+ * The product name is what comes before. Other shops' titles are not used.
+ */
+const AMAZON_TITLE = /^(.*?)\s+:\s+Amazon\.[a-z.]+(?::.*)?$/is
+const pageTitle = (title: string | undefined) => text(AMAZON_TITLE.exec(title ?? '')?.[1])
+
+const CURRENCY_SYMBOLS: Record<string, string> = { '€': 'EUR', '£': 'GBP', '$': 'USD' }
+
+/** Amazon's visible price ("€55.90"), from the price block at the top of the page. */
+const visiblePrice = (root: HTMLElement): Partial<Product> => {
+  const raw = text(root.querySelector('#corePrice_feature_div .a-offscreen')?.text)
+  const price = number(raw?.replace(/[^\d.,]/g, ''))
+  if (price === undefined) return {}
+  const symbol = Object.keys(CURRENCY_SYMBOLS).find((s) => raw!.includes(s))
+  return { price, currency: symbol && CURRENCY_SYMBOLS[symbol] }
+}
+
+const fromPage = (root: HTMLElement): Partial<Product> => ({
+  name: pageTitle(root.querySelector('title')?.text),
+  ...visiblePrice(root),
+})
+
 // ── Text ────────────────────────────────────────────────────────────
+
+// Sections with the package's size, not the item's, such as IKEA's "Peso e medidas da embalagem".
+const PACKAGING = '[id*="packaging"], [class*="__package"]'
 
 const visibleText = (root: HTMLElement): string => {
   const body = root.querySelector('body') ?? root
-  for (const hidden of body.querySelectorAll('script, style, noscript, template')) hidden.remove()
+  for (const hidden of body.querySelectorAll(`script, style, noscript, template, ${PACKAGING}`)) hidden.remove()
   return body.structuredText
 }
 

@@ -96,4 +96,27 @@ describe('parseDimensions', () => {
   it('ignores number sequences without a unit', () => {
     expect(parseDimensions('Available in 3 colours, 2 x 4 packs')).toEqual({})
   })
+
+  it('reads a letter after each value and a spelled-out unit', () => {
+    expect(parseDimensions('Item Dimensions D x W x H\n273D x 175W x 66H centimetres'))
+      .toEqual({ width: 175, depth: 273, height: 66 })
+    expect(parseDimensions('Size: 1.2L x 0.6W x 0.75H metres')).toEqual({ width: 60, depth: 120, height: 75 })
+  })
+
+  it('reads labels in brackets after a sequence', () => {
+    expect(parseDimensions('Overall dimensions: 60 x 50 x 40 cm (L x W x H).')).toEqual({ width: 50, depth: 60, height: 40 })
+  })
+
+  it('leaves a sequence unlabelled when the letters in brackets are not W, D, L or H', () => {
+    expect(parseDimensions('Dimensões: 241 × 151 × 58 cm (C × P × A)')).toEqual({ unlabeled: [241, 151, 58] })
+  })
+
+  it('reads table rows with the unit in the label', () => {
+    expect(parseDimensions('Largura (em cm)\n241\nAltura (em mm)\n580')).toEqual({ width: 241, height: 58 })
+    expect(parseDimensions('Profundidade (em cm) : 64.3')).toEqual({ depth: 64.3 })
+  })
+
+  it('ignores packaged-product rows', () => {
+    expect(parseDimensions('Produto embalado: largura (em cm)\n77.5')).toEqual({})
+  })
 })
