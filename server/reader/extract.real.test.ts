@@ -42,7 +42,7 @@ describe('IKEA', () => {
   })
 
   // Gap: the only sizes on the page are under "Peso e medidas da embalagem" (package), and they win.
-  it.fails('ignores package sizes on the VIMLE sofa cover, which has no product size', () => {
+  it('ignores package sizes on the VIMLE sofa cover, which has no product size', () => {
     expect(read('ikea-vimle-sofa-cover')).toEqual({
       name: 'VIMLE Capa p/sofá-cama 3 lugares',
       price: 340,
@@ -55,7 +55,7 @@ describe('IKEA', () => {
 
 // Gap: sizes come in table rows, "Largura (em cm)" then "241", with the unit in the label.
 describe('Leroy Merlin', () => {
-  it.fails('reads the corner sofa from its characteristics table', () => {
+  it('reads the corner sofa from its characteristics table', () => {
     expect(read('leroy-merlin-corner-sofa')).toEqual({
       name: 'Sofá de canto 4 lugares 241 cm, estilo minimalista, tecido canelado verde, assento profundo, sem montagem, 241 × 151 × 58 cm',
       width: 241,
@@ -70,7 +70,7 @@ describe('Leroy Merlin', () => {
 
   // The page labels only width and height; "180×90×75" in the name has no unit, so it is skipped.
   // "Produto embalado: …" rows are package sizes and must be ignored.
-  it.fails('reads the extending table from its characteristics table', () => {
+  it('reads the extending table from its characteristics table', () => {
     expect(read('leroy-merlin-extending-table')).toEqual({
       name: 'Mesa extensível, adequada para 6–8 pessoas, 180×90×75, nogueira',
       width: 90,
@@ -82,7 +82,7 @@ describe('Leroy Merlin', () => {
     })
   })
 
-  it.fails('reads the toilet from its characteristics table', () => {
+  it('reads the toilet from its characteristics table', () => {
     expect(read('leroy-merlin-toilet')).toEqual({
       name: 'Pack sanita ao chão rimless branco saída universal 3/4.5 l Sensea Remix',
       width: 36.5,
@@ -100,7 +100,7 @@ describe('Leroy Merlin', () => {
 // with " : Amazon.es: …" after it. The price is only in the visible text (#corePrice_feature_div).
 describe('Amazon.es', () => {
   // Also: "Overall dimensions: 60 x 50 x 40 cm (L x W x H)" puts the labels after the numbers.
-  it.fails('reads the vidaXL coffee table', () => {
+  it('reads the vidaXL coffee table', () => {
     expect(read('amazon-es-coffee-table')).toEqual({
       name: 'vidaXL Coffee Table Artisan Oak 60 x 50 x 40 cm Engineered Wood',
       width: 50,
@@ -113,7 +113,7 @@ describe('Amazon.es', () => {
   })
 
   // Also: "273D x 175W x 66H centimetres", with a letter after each number and the unit spelled out.
-  it.fails('reads the LIOVOYO corner sofa', () => {
+  it('reads the LIOVOYO corner sofa', () => {
     expect(read('amazon-es-corner-sofa')).toEqual({
       name: 'LIOVOYO L-Shaped 4 Seater Chaise Longue Sofa, Living Room Sofa with Removable Ottoman, Corduroy Upholstery, Deep Seat, Black',
       width: 175,
@@ -128,7 +128,7 @@ describe('Amazon.es', () => {
   // Also: "56.8D x 59.5W x 59.5H centimetres". Today the cut-out size wins:
   // "Oven size | Integration cavity size (…): 59.5 x 59.5 x 56.8 cm | 59 x 56 x 56 cm" gives [59, 56, 56].
   // The saved page shows no price, so none is expected.
-  it.fails('reads the Candy oven', () => {
+  it('reads the Candy oven', () => {
     expect(read('amazon-es-oven')).toEqual({
       name: 'Candy FIDCP X625 L, Multifunction Oven, 70L, Tray and Grate, Aquactive Cleaning, Convection + Radial Fan, 8 Functions, Display Timer Touch, Push & Pull Controls, 2 Glass Door, Stainless Steel and Black',
       width: 59.5,

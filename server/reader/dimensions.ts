@@ -23,6 +23,9 @@ const SHORT_LABELS: Record<string, Axis> = {
   d: 'depth', p: 'depth', f: 'depth',
   h: 'height', a: 'height', al: 'height',
 }
+// English letters after a value ("273D x 175W x 66H") or after a sequence ("(L x W x H)").
+// Here L is length, which is depth, as "Comprimento" is on IKEA's pages.
+const LETTER_LABELS: Record<string, Axis> = { w: 'width', d: 'depth', l: 'depth', h: 'height' }
 // Words that may sit next to a label without making it some other measurement
 // ("Overall width", "Altura total"). Anything else ("Seat height") is ignored.
 const QUALIFIERS = new Set(['overall', 'total', 'max', 'maximum', 'máx', 'máxima', 'máximo', 'product', 'external', 'exterior', 'outer'])
@@ -39,20 +42,41 @@ const alternation = (words: string[]) => [...words].sort((a, b) => b.length - a.
 const LONG = alternation(Object.keys(LONG_LABELS))
 const ANY_LABEL = alternation([...Object.keys(LONG_LABELS), ...Object.keys(SHORT_LABELS)])
 const NUM = String.raw`\d+(?:[.,]\d+)?`
-const UNIT = String.raw`(?:mm|cm|m|inches|inch|in|"|″)(?![\p{L}\d²³])` // not m², m2, m³
+// Spelled-out units are tried first, so "centimetres" isn't read as "cm" plus letters.
+const UNIT_WORDS = [
+  'millimetres', 'millimeters', 'millimetre', 'millimeter', 'milímetros', 'milimetros',
+  'centimetres', 'centimeters', 'centimetre', 'centimeter', 'centímetros', 'centimetros',
+  'metres', 'meters', 'metre', 'meter', 'metros',
+]
+const UNIT = String.raw`(?:${alternation(UNIT_WORDS)}|mm|cm|m|inches|inch|in|"|″)(?![\p{L}\d²³])` // not m², m2, m³
+const LETTER = String.raw`[dwhl](?!\p{L})`
 const QUALIFIER = alternation([...QUALIFIERS])
 
-const ITEM = String.raw`(?:(?<!\p{L})(?:${ANY_LABEL})\s*:?\s*)?${NUM}\s*(?:${UNIT})?`
+// A value has a label before it ("L 80") or a letter after it ("80W"), never both.
+const ITEM = String.raw`(?:(?<!\p{L})(?:${ANY_LABEL})\s*:?\s*${NUM}|${NUM}(?:${LETTER})?)\s*(?:${UNIT})?`
 const SEP = String.raw`\s*[x×]\s*`
 const SEQUENCE = new RegExp(String.raw`${ITEM}(?:${SEP}${ITEM}){1,2}`, 'giu')
-const SEQUENCE_PART = new RegExp(String.raw`^(?:(${ANY_LABEL})\s*:?\s*)?(${NUM})\s*(${UNIT})?$`, 'iu')
-const SINGLE = new RegExp(String.raw`(?<!\p{L})(${LONG})(?:\s+(?:${QUALIFIER}))?\s*:?\s*(${NUM})\s*(${UNIT})`, 'giu')
+const SEQUENCE_PART = new RegExp(String.raw`^(?:(${ANY_LABEL})\s*:?\s*)?(${NUM})(${LETTER})?\s*(${UNIT})?$`, 'iu')
+// "(L x W x H)" right after a sequence.
+const TRAILING_LABELS = /^\s*\(\s*(\p{L})\s*[x×]\s*(\p{L})(?:\s*[x×]\s*(\p{L}))?\s*\)/u
+// "Width: 210 cm", or a table row with the unit in its label: "Largura (em cm)", then "241".
+const SINGLE = new RegExp(
+  String.raw`(?<!\p{L})(${LONG})(?:\s+(?:${QUALIFIER}))?\s*` +
+  String.raw`(?:\(\s*(?:em|en|in)\s+(${UNIT})\s*\)\s*:?\s*(${NUM})(?![\p{L}\d])|:?\s*(${NUM})\s*(${UNIT}))`,
+  'giu',
+)
 const VALUE_WITH_UNIT = new RegExp(String.raw`${NUM}\s*${UNIT}`, 'giu')
 
 const toCm = (number: string, unit: string): number => {
   const value = Number(number.replace(',', '.'))
-  const factor = { mm: 0.1, cm: 1, m: 100 }[unit.toLowerCase()] ?? 2.54 // the rest are inches
-  return Math.round(value * factor * 10) / 10
+  return Math.round(value * unitFactor(unit.toLowerCase()) * 10) / 10
+}
+
+const unitFactor = (unit: string): number => {
+  if (unit === 'mm' || unit.startsWith('mil')) return 0.1
+  if (unit === 'cm' || unit.startsWith('cent')) return 1
+  if (unit === 'm' || unit.startsWith('met')) return 100
+  return 2.54 // the rest are inches
 }
 
 const labelAxis = (label: string): Axis | undefined => {
@@ -67,9 +91,16 @@ const readSequences = (text: string, result: Dimensions) => {
     if (!isPlain(text, match.index)) continue
     const parts = span.split(new RegExp(SEP, 'iu')).map((part) => SEQUENCE_PART.exec(part.trim()))
     if (parts.some((p) => !p)) continue
-    const trailingUnit = parts.at(-1)![3]
-    if (!trailingUnit && parts.every((p) => !p![3])) continue // no unit: not a size
-    const values = parts.map((p) => ({ axis: p![1] ? labelAxis(p![1]) : undefined, cm: toCm(p![2], p![3] ?? trailingUnit) }))
+    const trailingUnit = parts.at(-1)![4]
+    if (!trailingUnit && parts.every((p) => !p![4])) continue // no unit: not a size
+    const values = parts.map((p) => ({
+      axis: p![1] ? labelAxis(p![1]) : p![3] ? LETTER_LABELS[p![3].toLowerCase()] : undefined,
+      cm: toCm(p![2], p![4] ?? trailingUnit),
+    }))
+    const trailing = TRAILING_LABELS.exec(text.slice(match.index + span.length))?.slice(1).filter(Boolean)
+    if (trailing?.length === values.length && values.every((v) => !v.axis)) {
+      trailing.forEach((letter, i) => (values[i].axis = LETTER_LABELS[letter.toLowerCase()]))
+    }
 
     const axes = values.map((v) => v.axis)
     if (axes.every(Boolean) && new Set(axes).size === axes.length) {
@@ -97,9 +128,9 @@ const isPlain = (text: string, start: number): boolean => {
 /** Reads "Width: 210 cm"-style values. The first plain one per axis wins. */
 const readSingles = (text: string, result: Dimensions) => {
   for (const match of text.matchAll(SINGLE)) {
-    const [, label, number, unit] = match
+    const [, label, rowUnit, rowNumber, number, unit] = match
     if (!isPlain(text, match.index)) continue
-    result[labelAxis(label)!] ??= toCm(number, unit)
+    result[labelAxis(label)!] ??= rowUnit ? toCm(rowNumber, rowUnit) : toCm(number, unit)
   }
 }
 
