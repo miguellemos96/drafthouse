@@ -16,7 +16,8 @@ Run from the repo root. Node 24 or later.
 - Build the site: `npm run build`
 - All of the above: `npm run check`
 - End-to-end tests: `npm run e2e` (Playwright, Chromium only, `e2e/*.spec.ts`). It builds the site and serves it with `vite preview` by itself, and saves a screenshot of the app to `test-results/app.png`. First time on a machine: `npx playwright install chromium`. For visible changes, put that screenshot in the PR's Evidence section.
-- Dev server: `npm run dev`. It doesn't exit, so never run it in the foreground of an unattended session; use the end-to-end tests to see the app instead.
+- Your own browser checks: put throwaway specs in `.factory-tmp/e2e/` and run `npm run e2e:scratch`. It uses the same server, which Playwright also starts and stops.
+- Dev server: `npm run dev`, for humans only. In a factory session, never start a server or anything else in the background. A process left running keeps files in `node_modules` open, so the next tick's `git clean` and `npm ci` fail. The `guard-bash` hook refuses these commands.
 
 ## Code layout
 

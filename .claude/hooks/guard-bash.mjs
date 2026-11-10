@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-// PreToolUse hook for Bash. Refuses commands that only the human may run,
-// even if a permission rule is too broad. Claude Code passes the tool call as
+// PreToolUse hook for Bash and PowerShell. Refuses commands that only the human may run,
+// even if a permission rule is too broad, and commands that leave a server or other
+// process running after the session ends. Tests: guard-bash.test.mjs. Claude Code passes the tool call as
 // JSON on stdin; exit code 2 blocks the call and shows stderr to the agent.
 //
 // Wire it in .claude/settings.json:
@@ -16,10 +17,30 @@ const PROTECTED = ['main', 'master']
 const input = JSON.parse(readFileSync(0, 'utf8'))
 const command = String(input?.tool_input?.command ?? '')
 
+// Long-running processes outlive the session and keep files in node_modules open,
+// so the next tick's `git clean` and `npm ci` fail. `npm run e2e` starts and stops its own server.
+const SERVERS = [
+  [/\bvite\b(?!\s+build\b)/, 'vite dev or preview server'],
+  [/\bnpm\s+(start|run\s+(dev|preview|start))\b/, 'npm dev/preview/start server'],
+  [/\bnode\s+\S*server[/\\]main\.ts\b/, 'the app server'],
+  [/\b(Start-Process|Start-Job|nohup|setsid|disown)\b/i, 'a detached process'],
+  [/(^|[^&>])&\s*$/, 'a background job (&)'],
+]
+const SERVER_HINT = 'To see the app, run `npm run e2e` (or `npm run e2e:scratch` for your own checks): Playwright starts the server and stops it.'
+
 // Split on shell operators so `a && git push origin main` is still caught.
 const parts = command.split(/&&|\|\||;|\||\n|\$\(|`/).map((p) => p.trim()).filter(Boolean)
 
 const reasons = []
+if (input?.tool_input?.run_in_background === true) reasons.push(`background commands (${SERVER_HINT})`)
+// Only check commands that run programs, so `grep vite` or `gh pr comment --body "…vite…"` pass.
+const RUNNERS = /^(npx|npm|pnpm|yarn|node|vite|bash|sh|cmd|pwsh|powershell|start|nohup|setsid|Start-Process|Start-Job)(\.exe)?$/i
+for (const part of command.split(/&&|\|\||;|\||\n/).map((p) => p.trim()).filter(Boolean)) {
+  const program = part.split(/\s+/).find((w) => !/^\w+=/.test(w)) ?? ''
+  for (const [pattern, what] of SERVERS) {
+    if ((RUNNERS.test(program) || what.startsWith('a background')) && pattern.test(part)) reasons.push(`starting ${what} (${SERVER_HINT})`)
+  }
+}
 for (const part of parts) {
   const words = part.split(/\s+/)
   const at = words.indexOf('git')

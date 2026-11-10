@@ -46,6 +46,8 @@ Run the checks from `CLAUDE.md` → Commands before committing.
 
 For anything a user can see, run the app and capture proof: command output, a screenshot, or a short browser script. Put it in the PR. If you can't run the app, say so in the PR. The verifier will judge.
 
+Run the app only through Playwright: `npm run e2e`, plus `npm run e2e:scratch` for throwaway specs in `.factory-tmp/e2e/`. Give each a 600000 ms timeout. Playwright starts the server and stops it. Never start a server yourself, and never run anything in the background: a process left running locks `node_modules` and breaks the next tick. The `guard-bash` hook refuses both. For the Node server, test it in-process from Vitest instead.
+
 ## 5. PR
 
 - Commit as `<type>(#N): <subject>`, where the type is `fix`, `feat`, `refactor`, `chore` or `docs`.

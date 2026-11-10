@@ -11,9 +11,10 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "vitest run",
-    "test:factory": "node --test scripts/factory/next-step.test.mjs",
+    "test:factory": "node --test scripts/factory/next-step.test.mjs .claude/hooks/guard-bash.test.mjs",
     "check": "npm run typecheck && npm run lint && npm test && npm run test:factory && npm run build",
-    "e2e": "playwright test"
+    "e2e": "playwright test --project=chromium",
+    "e2e:scratch": "playwright test --project=scratch"
   },
   "engines": {
     "node": ">=24"
