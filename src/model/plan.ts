@@ -102,3 +102,7 @@ const validateOutline = (corners: Point[]) => {
     }
   }
 }
+
+// A wall is as high as its room; a wall shared by rooms of different heights takes the taller.
+export const wallHeight = (plan: Plan, wall: Wall): number =>
+  Math.max(...plan.rooms.filter((room) => wall.rooms.includes(room.id)).map((room) => room.height))

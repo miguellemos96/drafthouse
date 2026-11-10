@@ -6,6 +6,8 @@ export const en = {
   'language.en': 'English',
   'language.es': 'Español',
   'language.pt': 'Português',
+  'view.top': 'Top view',
+  'view.orbit': '3D view',
 }
 
 export type StringKey = keyof typeof en
