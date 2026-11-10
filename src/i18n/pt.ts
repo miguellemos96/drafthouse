@@ -6,4 +6,6 @@ export const pt: Strings = {
   'language.en': 'English',
   'language.es': 'Español',
   'language.pt': 'Português',
+  'view.top': 'Vista de cima',
+  'view.orbit': 'Vista 3D',
 }

@@ -15,6 +15,23 @@ test('the app opens with its title and a drawn 3D view', async ({ page }) => {
   await page.screenshot({ path: 'test-results/app.png' })
 })
 
+test('the Top view button looks straight down on the home, and switches back', async ({ page }) => {
+  await page.goto('/')
+  const canvas = page.locator('#view canvas')
+  await expect.poll(async () => distinctColours(page, await canvas.screenshot()), { timeout: 10_000 }).toBeGreaterThan(1)
+  const orbit = await canvas.screenshot()
+
+  const toggle = page.getByRole('button', { name: 'Top view' })
+  await toggle.click()
+  const back = page.getByRole('button', { name: '3D view' })
+  await expect(back).toHaveAttribute('aria-pressed', 'true')
+  await expect.poll(async () => (await canvas.screenshot()).equals(orbit), { timeout: 10_000 }).toBe(false)
+  await page.screenshot({ path: 'test-results/top-view.png' })
+
+  await back.click()
+  await expect(page.getByRole('button', { name: 'Top view' })).toHaveAttribute('aria-pressed', 'false')
+})
+
 // Samples a spread of pixels from a PNG and counts their distinct colours.
 // The browser decodes the PNG, so the test needs no image library.
 function distinctColours(page: Page, png: Buffer): Promise<number> {

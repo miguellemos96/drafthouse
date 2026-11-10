@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createRectRoom, createRoom, moveCorner, roomArea, wallLength, wallsOf, type Plan } from './plan.ts'
+import { createRectRoom, createRoom, moveCorner, roomArea, wallHeight, wallLength, wallsOf, type Plan } from './plan.ts'
 
 const sideBySide = (): Plan => ({
   rooms: [
@@ -108,5 +108,19 @@ describe('moveCorner', () => {
   it('throws when the move makes an outline cross itself', () => {
     const plan = { rooms: [createRectRoom({ name: 'A', width: 300, length: 300, height: 250 })] }
     expect(() => moveCorner(plan, { x: 300, y: 0 }, { x: -100, y: 150 })).toThrow('Room outline crosses itself.')
+  })
+})
+
+describe('wallHeight', () => {
+  it('is the room height, and the taller room for a shared wall', () => {
+    const plan: Plan = {
+      rooms: [
+        createRoom({ id: 'A', name: 'A', height: 250, corners: [{ x: 0, y: 0 }, { x: 300, y: 0 }, { x: 300, y: 300 }, { x: 0, y: 300 }] }),
+        createRoom({ id: 'B', name: 'B', height: 270, corners: [{ x: 300, y: 0 }, { x: 600, y: 0 }, { x: 600, y: 300 }, { x: 300, y: 300 }] }),
+      ],
+    }
+    const heights = wallsOf(plan).map((w) => [w.rooms.join('+'), wallHeight(plan, w)])
+    expect(heights.filter(([rooms]) => rooms === 'A').every(([, h]) => h === 250)).toBe(true)
+    expect(heights.find(([rooms]) => rooms === 'A+B')).toEqual(['A+B', 270])
   })
 })
