@@ -41,6 +41,8 @@ FAIL if they pass on the base: the bug was never reproduced.
 
 `git switch --detach SHA`, install if a lockfile changed, run the checks from `CLAUDE.md`, and for a user-visible change, run the app and try each acceptance scenario yourself. Write your own check rather than reusing the author's evidence.
 
+See the app only through Playwright, which starts the server and stops it when done. Put your own specs in `.factory-tmp/e2e/` and run `npm run e2e:scratch` with a 600000 ms timeout. Never start a server yourself, and never run anything in the background: a process left running locks `node_modules` and breaks the next tick. The `guard-bash` hook refuses both.
+
 INCONCLUSIVE if the app won't start after one clean retry.
 
 ## 5. Post

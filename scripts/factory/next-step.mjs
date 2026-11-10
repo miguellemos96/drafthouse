@@ -5,7 +5,8 @@
 // Usage:
 //   node scripts/factory/next-step.mjs            next step as JSON
 //   node scripts/factory/next-step.mjs --dry-run  human-readable queue view
-//   node scripts/factory/next-step.mjs --lock-changed   "yes" if package-lock.json changed since last npm ci
+//   node scripts/factory/next-step.mjs --lock-changed   "yes" if package-lock.json changed since the last successful npm ci
+//   node scripts/factory/next-step.mjs --lock-installed npm ci succeeded: remember this package-lock.json
 //
 // The pure functions (pickStep, orderQueue, verdictOf) are exported for tests:
 //   node --test scripts/factory/next-step.test.mjs
@@ -100,18 +101,23 @@ const loadConfig = () => {
   return { ...DEFAULTS, ...(existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : {}) }
 }
 
+const LOCK_MARKER = join(HOME, 'lock.sha256')
+const lockHash = () => createHash('sha256').update(readFileSync('package-lock.json')).digest('hex')
+
+// The marker is written only after npm ci succeeds, so a failed install is retried next tick.
 const lockChanged = () => {
   if (!existsSync('package-lock.json')) return false
+  return !existsSync(LOCK_MARKER) || readFileSync(LOCK_MARKER, 'utf8') !== lockHash() || !existsSync('node_modules')
+}
+
+const lockInstalled = () => {
   mkdirSync(HOME, { recursive: true })
-  const hash = createHash('sha256').update(readFileSync('package-lock.json')).digest('hex')
-  const marker = join(HOME, 'lock.sha256')
-  const changed = !existsSync(marker) || readFileSync(marker, 'utf8') !== hash || !existsSync('node_modules')
-  if (changed) writeFileSync(marker, hash)
-  return changed
+  writeFileSync(LOCK_MARKER, lockHash())
 }
 
 const main = () => {
   if (process.argv.includes('--lock-changed')) return console.log(lockChanged() ? 'yes' : 'no')
+  if (process.argv.includes('--lock-installed')) return lockInstalled()
 
   const config = loadConfig()
   const me = execFileSync('gh', ['api', 'user', '--jq', '.login'], { encoding: 'utf8' }).trim()

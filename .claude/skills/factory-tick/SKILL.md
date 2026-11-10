@@ -13,7 +13,9 @@ You run unattended. Do exactly one step, then stop.
    - `git switch --detach origin/main`
    - `git reset --hard origin/main`
    - `git clean -fdx -e .factory-tmp`
-   - `npm ci`, only if `node scripts/factory/next-step.mjs --lock-changed` prints `yes`
+   - `npm ci`, only if `node scripts/factory/next-step.mjs --lock-changed` prints `yes`. When `npm ci` succeeds, run `node scripts/factory/next-step.mjs --lock-installed`.
+
+   If any of these fails, stop: append `<date time> failed: <command> <first error line>` to the Factory log, and end with `TICK-RESULT: failed dirty folder: <command>`. Don't substitute another command, such as `npm install` for `npm ci`, and don't try to stop processes. A failure here usually means a leftover process holds a file open, and only the human clears it.
 2. Run `node scripts/factory/next-step.mjs` and read the one JSON line it prints.
 3. Act on `step`:
    - `idle`: print `TICK-RESULT: idle <reason>` and stop. Do nothing else.
