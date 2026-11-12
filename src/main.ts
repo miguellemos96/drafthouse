@@ -4,8 +4,8 @@
 import * as THREE from 'three'
 import { loadLanguage } from './i18n/index.ts'
 import { loadHome, saveHome } from './model/autosave.ts'
-import { newHome } from './model/home.ts'
-import { sampleHome } from './model/sample.ts'
+import { currentVersion } from './model/home.ts'
+import { newSampleHome } from './model/sample.ts'
 import { createStore, type Store } from './model/store.ts'
 import { createCameraRig } from './scene/camera.ts'
 import { buildHome, type HomeView } from './scene/home.ts'
@@ -16,7 +16,7 @@ import { mountViewToggle } from './ui/view-toggle.ts'
 loadLanguage(navigator.languages)
 applyLanguage()
 
-const store = createStore(loadHome(() => newHome(sampleHome())))
+const store = createStore(loadHome(newSampleHome))
 store.subscribe(saveHome)
 // For end-to-end tests and the browser console.
 declare global {
@@ -41,7 +41,7 @@ const sun = new THREE.DirectionalLight(0xffffff, 1.2)
 sun.position.set(-300, 800, 500)
 scene.add(sun)
 
-let home: HomeView = buildHome(store.get().plan)
+let home: HomeView = buildHome(store.get().plan, currentVersion(store.get()).items)
 scene.add(home.group)
 
 // The scene redraws whenever the home changes.
@@ -53,7 +53,7 @@ store.subscribe((next) => {
       object.material.dispose()
     }
   })
-  home = buildHome(next.plan)
+  home = buildHome(next.plan, currentVersion(next).items)
   scene.add(home.group)
 })
 
