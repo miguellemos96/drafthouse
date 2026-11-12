@@ -44,6 +44,15 @@ export const verdictOf = (pr) => {
   return status?.state ?? null // SUCCESS | FAILURE | ERROR | PENDING | null
 }
 
+/** Issue numbers named on "Blocked by" lines: "Blocked by #2 and #7". */
+export const blockersOf = (body) =>
+  [...(body ?? '').matchAll(/^[\s>*_-]*blocked by\b(.*)$/gim)]
+    .flatMap((m) => [...m[1].matchAll(/#(\d+)/g)].map((n) => Number(n[1])))
+
+/** Adds `openBlockers` to each issue: how many of its blockers are still open issues or PRs. */
+export const withOpenBlockers = (issues, openNumbers) =>
+  issues.map((i) => ({ ...i, openBlockers: blockersOf(i.body).filter((n) => openNumbers.has(n)).length }))
+
 const countComments = (pr, heading) => (pr.comments ?? []).filter((c) => c.body.startsWith(heading)).length
 
 /** Queue order: workable issues only, bugs first, then oldest first. */
@@ -123,9 +132,13 @@ const main = () => {
   const me = execFileSync('gh', ['api', 'user', '--jq', '.login'], { encoding: 'utf8' }).trim()
   const prs = gh('pr', 'list', '--state', 'open', '--author', '@me', '--json',
     'url,number,headRefName,isDraft,statusCheckRollup,comments,closingIssuesReferences')
-  const issues = gh('issue', 'list', '--state', 'open', '--label', 'ready-for-agent', '--limit', '100', '--json',
-    'number,title,labels,assignees,createdAt')
-  // TODO: fill `openBlockers` from GitHub issue dependencies (REST: /issues/{n}/dependencies/blocked_by).
+  // A blocker counts while it is an open issue or an open PR (of anyone): merged or closed means done.
+  const openNumbers = new Set([
+    ...gh('issue', 'list', '--state', 'open', '--limit', '500', '--json', 'number'),
+    ...gh('pr', 'list', '--state', 'open', '--limit', '200', '--json', 'number'),
+  ].map((x) => x.number))
+  const issues = withOpenBlockers(gh('issue', 'list', '--state', 'open', '--label', 'ready-for-agent', '--limit', '100', '--json',
+    'number,title,labels,assignees,createdAt,body'), openNumbers)
 
   const step = pickStep({ now: new Date(), config, stop: existsSync(join(HOME, 'STOP')), prs, issues, me })
 
@@ -133,6 +146,7 @@ const main = () => {
     const openPrIssues = new Set(prs.flatMap((p) => (p.closingIssuesReferences ?? []).map((r) => r.number)))
     console.log('Next step:', step)
     console.log('Queue:', orderQueue(issues, { me, openPrIssues }).map((i) => `#${i.number} ${i.title}`))
+    console.log('Waiting on blockers:', issues.filter((i) => i.openBlockers > 0).map((i) => `#${i.number} blocked by ${blockersOf(i.body).filter((n) => openNumbers.has(n)).map((n) => '#' + n).join(', ')}`))
     return
   }
   console.log(JSON.stringify(step))
