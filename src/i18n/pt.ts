@@ -8,4 +8,11 @@ export const pt: Strings = {
   'language.pt': 'Português',
   'view.top': 'Vista de cima',
   'view.orbit': 'Vista 3D',
+  'version.asItIs': 'Como está',
+  'file.export': 'Exportar',
+  'file.import': 'Importar',
+  'file.error.not-json': 'Não foi possível ler esse ficheiro: não é um ficheiro do DraftHouse.',
+  'file.error.not-a-home': 'Esse ficheiro não é uma casa do DraftHouse.',
+  'file.error.newer-version': 'Esse ficheiro foi guardado por uma versão mais recente do DraftHouse.',
+  'file.error.unreadable': 'Não foi possível abrir esse ficheiro.',
 }

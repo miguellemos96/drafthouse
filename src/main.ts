@@ -1,15 +1,30 @@
-// Entry point: the sample home in 3D, with orbit controls and a top view.
+// Entry point: the saved home (or the sample home) in 3D, with orbit controls, a top view,
+// autosave, and Export and Import.
 // Rooms, items and panels are added issue by issue (see docs/spec.md).
 import * as THREE from 'three'
 import { loadLanguage } from './i18n/index.ts'
+import { loadHome, saveHome } from './model/autosave.ts'
+import { newHome } from './model/home.ts'
 import { sampleHome } from './model/sample.ts'
+import { createStore, type Store } from './model/store.ts'
 import { createCameraRig } from './scene/camera.ts'
-import { buildHome } from './scene/home.ts'
+import { buildHome, type HomeView } from './scene/home.ts'
+import { mountFileButtons } from './ui/file-buttons.ts'
 import { applyLanguage, mountLanguageSwitcher } from './ui/language-switcher.ts'
 import { mountViewToggle } from './ui/view-toggle.ts'
 
 loadLanguage(navigator.languages)
 applyLanguage()
+
+const store = createStore(loadHome(() => newHome(sampleHome())))
+store.subscribe(saveHome)
+// For end-to-end tests and the browser console.
+declare global {
+  interface Window {
+    drafthouse: { store: Store }
+  }
+}
+window.drafthouse = { store }
 
 const container = document.getElementById('view')!
 const renderer = new THREE.WebGLRenderer({ antialias: true })
@@ -26,16 +41,31 @@ const sun = new THREE.DirectionalLight(0xffffff, 1.2)
 sun.position.set(-300, 800, 500)
 scene.add(sun)
 
-const home = buildHome(sampleHome())
+let home: HomeView = buildHome(store.get().plan)
 scene.add(home.group)
+
+// The scene redraws whenever the home changes.
+store.subscribe((next) => {
+  scene.remove(home.group)
+  home.group.traverse((object) => {
+    if (object instanceof THREE.Mesh) {
+      object.geometry.dispose()
+      object.material.dispose()
+    }
+  })
+  home = buildHome(next.plan)
+  scene.add(home.group)
+})
 
 const rig = createCameraRig(renderer.domElement, home.group)
 const { camera, controls } = rig
 
 const toggle = mountViewToggle(document.body, rig.isTopView, rig.setTopView)
+const fileButtons = mountFileButtons(document.body, store)
 mountLanguageSwitcher(document.body, () => {
   applyLanguage()
   toggle.render()
+  fileButtons.render()
 })
 
 const resize = () => {
