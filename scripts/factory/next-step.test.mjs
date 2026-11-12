@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { inWindow, orderQueue, pickStep, verdictOf } from './next-step.mjs'
+import { blockersOf, inWindow, orderQueue, pickStep, verdictOf, withOpenBlockers } from './next-step.mjs'
 
 const config = { start: '21:00', cutoff: '03:00', maxFixRounds: 2, maxInconclusive: 2, branchPrefix: 'factory/' }
 const night = new Date('2026-11-06T23:00:00')
@@ -79,4 +79,24 @@ test('verdictOf reads the verifier status only', () => {
 
 test('a PR with no checks registered yet is not verified', () => {
   assert.equal(pick({ prs: [pr({ statusCheckRollup: [] })] }).step, 'idle')
+})
+
+test('blockersOf reads every number on "Blocked by" lines, and nothing else', () => {
+  assert.deepEqual(blockersOf('Blocked by #2 and #7\n\nDraw the plan.'), [2, 7])
+  assert.deepEqual(blockersOf('Intro\n**Blocked by** #12, #13'), [12, 13])
+  assert.deepEqual(blockersOf('> blocked by #4\nBlocked by #5'), [4, 5])
+  assert.deepEqual(blockersOf('See #3. This is not blocked by anything here: #3 is just mentioned.'), [])
+  assert.deepEqual(blockersOf(undefined), [])
+})
+
+test('an issue waits while a blocker is open, and joins the queue once all are closed', () => {
+  const issues = [
+    { ...issue(10, ['ready-for-agent'], '2026-01-01'), body: 'Blocked by #8 and #9' },
+    { ...issue(11, ['ready-for-agent'], '2026-02-01'), body: 'Blocked by #9' },
+    { ...issue(12, ['ready-for-agent'], '2026-03-01'), body: 'No blockers.' },
+  ]
+  const queueWith = (open) => orderQueue(withOpenBlockers(issues, new Set(open)), { me: 'me', openPrIssues: new Set() })
+  assert.deepEqual(queueWith([8, 9]).map((i) => i.number), [12])
+  assert.deepEqual(queueWith([8]).map((i) => i.number), [11, 12])
+  assert.deepEqual(queueWith([]).map((i) => i.number), [10, 11, 12])
 })
