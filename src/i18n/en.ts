@@ -8,6 +8,13 @@ export const en = {
   'language.pt': 'Português',
   'view.top': 'Top view',
   'view.orbit': '3D view',
+  'version.asItIs': 'As it is',
+  'file.export': 'Export',
+  'file.import': 'Import',
+  'file.error.not-json': 'That file could not be read: it is not a DraftHouse file.',
+  'file.error.not-a-home': 'That file is not a DraftHouse home.',
+  'file.error.newer-version': 'That file was saved by a newer version of DraftHouse.',
+  'file.error.unreadable': 'That file could not be opened.',
 }
 
 export type StringKey = keyof typeof en

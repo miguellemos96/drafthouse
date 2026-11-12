@@ -1,4 +1,4 @@
-// The home the page starts with until saving exists: two rooms side by side.
+// The plan of the home the page starts with when nothing is saved: two rooms side by side.
 import { createRoom, type Plan } from './plan.ts'
 
 export const sampleHome = (): Plan => ({
