@@ -1,4 +1,8 @@
 {
+  "env": {
+    "GITHUB_TOKEN": "",
+    "GH_TOKEN": ""
+  },
   "permissions": {
     "allow": [
       "Read",
