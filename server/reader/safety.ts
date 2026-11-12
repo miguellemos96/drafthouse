@@ -35,6 +35,9 @@ export interface FetchDeps {
 }
 
 export type FetchResult = { ok: true; url: string; body: string } | { ok: false; error: ReadError }
+export type BytesResult =
+  | { ok: true; url: string; bytes: Uint8Array; contentType?: string }
+  | { ok: false; error: ReadError }
 
 const ALLOWED_PORTS = new Set(['', '80', '443'])
 
@@ -222,7 +225,7 @@ const readBody = async (response: RawResponse, maxBytes: number): Promise<Uint8A
   return bytes
 }
 
-const follow = async (start: URL, deps: FetchDeps, limits: Limits, signal: AbortSignal): Promise<FetchResult> => {
+const follow = async (start: URL, deps: FetchDeps, limits: Limits, signal: AbortSignal): Promise<BytesResult> => {
   let url = start
   for (let redirects = 0; ; redirects++) {
     const target = await resolveHost(url, deps.lookup)
@@ -247,24 +250,24 @@ const follow = async (start: URL, deps: FetchDeps, limits: Limits, signal: Abort
       return { ok: false, error: 'fetch-failed' }
     }
     const bytes = await readBody(response, limits.maxBytes)
-    return { ok: true, url: url.href, body: decode(bytes, response.contentType) }
+    return { ok: true, url: url.href, bytes, contentType: response.contentType }
   }
 }
 
 /**
- * Fetches a page by the safety rules: public addresses only (checked again on every redirect),
+ * Fetches any response by the safety rules: public addresses only (checked again on every redirect),
  * at most `maxRedirects` redirects, `timeoutMs` in all and `maxBytes` per response.
  */
-export const safeFetch = async (url: URL, deps: FetchDeps, limits: Limits = LIMITS): Promise<FetchResult> => {
+export const safeFetchBytes = async (url: URL, deps: FetchDeps, limits: Limits = LIMITS): Promise<BytesResult> => {
   const controller = new AbortController()
   let timer: ReturnType<typeof setTimeout> | undefined
-  const timedOut = new Promise<FetchResult>((resolve) => {
+  const timedOut = new Promise<BytesResult>((resolve) => {
     timer = setTimeout(() => {
       controller.abort()
       resolve({ ok: false, error: 'timeout' })
     }, limits.timeoutMs)
   })
-  const work = follow(url, deps, limits, controller.signal).catch((error: unknown): FetchResult => {
+  const work = follow(url, deps, limits, controller.signal).catch((error: unknown): BytesResult => {
     if (error instanceof Stop) return { ok: false, error: error.code }
     return { ok: false, error: controller.signal.aborted ? 'timeout' : 'fetch-failed' }
   })
@@ -273,6 +276,13 @@ export const safeFetch = async (url: URL, deps: FetchDeps, limits: Limits = LIMI
   } finally {
     clearTimeout(timer)
   }
+}
+
+/** Fetches a page by the safety rules of `safeFetchBytes` and decodes it as text. */
+export const safeFetch = async (url: URL, deps: FetchDeps, limits: Limits = LIMITS): Promise<FetchResult> => {
+  const result = await safeFetchBytes(url, deps, limits)
+  if (!result.ok) return result
+  return { ok: true, url: result.url, body: decode(result.bytes, result.contentType) }
 }
 
 // --- Rate limit ------------------------------------------------------------

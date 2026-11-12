@@ -23,6 +23,8 @@ export interface Product {
   price?: number
   currency?: string
   photoUrl?: string
+  /** Main colour of the photo as `#rrggbb`. Added by readLink after fetching the photo, never by extraction. */
+  colour?: string
   templateGuess?: TemplateGuess
 }
 
