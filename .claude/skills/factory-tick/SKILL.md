@@ -8,6 +8,7 @@ disable-model-invocation: true
 
 You run unattended. Do exactly one step, then stop.
 
+0. Run `gh api user --jq .login`. It must print `miguellemos96`, the repo owner. If it prints anything else, stop and end with `TICK-RESULT: failed wrong gh account: <login>`, without logging, because the log would be written as that account. `.claude/settings.json` clears `GITHUB_TOKEN` and `GH_TOKEN` so gh uses the owner's sign-in; a token set elsewhere (such as a work account's) has no write access here.
 1. Bring the worktree to a clean state. Run each command in its own call:
    - `git fetch origin --prune`
    - `git switch --detach origin/main`
@@ -22,7 +23,9 @@ You run unattended. Do exactly one step, then stop.
    - `verify`: run the `verifier` skill with the given `pr`.
    - `fix`: run the `worker` skill with `<issue> fix <pr>`.
    - `work`: run the `worker` skill with the given `issue`.
-4. Append one line to the Factory log issue: `gh issue comment <log-issue> --body "<date time> <step> #<n>: <the skill's result line>"`. The log issue number is in `factory.config.json`.
+
+   The worker and verifier skills can't be started with the Skill tool, so nothing starts them by accident. Read `.claude/skills/<name>/SKILL.md` and follow it, with the arguments above in place of its placeholders.
+4. Append one line to the Factory log issue: `gh issue comment <log-issue> --body "<date time> <step> #<n>: <the skill's result line>"`. The log issue number is `logIssue` in `~/.factory/config.json`.
 5. Last line, alone on the line: `TICK-RESULT: <step> <the skill's result line>`.
 
 If you hit a usage limit, stop. Don't retry; the next scheduled tick continues.
