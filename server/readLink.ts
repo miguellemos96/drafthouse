@@ -1,7 +1,8 @@
 // POST /api/read-link: a URL in, a product (or an error code) out. Never the raw page.
 
 import { extractProduct, type Product } from './reader/extract.ts'
-import { checkUrl, safeFetch, type FetchDeps, type Limits, type ReadError } from './reader/safety.ts'
+import { photoColour } from './reader/photo.ts'
+import { checkUrl, safeFetch, safeFetchBytes, type FetchDeps, type Limits, type ReadError } from './reader/safety.ts'
 
 export interface ReadLinkDeps extends FetchDeps {
   /** Records one request from this visitor and says whether it is allowed. */
@@ -34,5 +35,15 @@ export const readLink = async (body: unknown, ip: string, deps: ReadLinkDeps): P
 
   const product = extractProduct(page.body, page.url)
   if (Object.keys(product).length === 0) return fail('nothing-found')
-  return { status: 200, json: product }
+  const colour = await colourOf(product.photoUrl, deps)
+  return { status: 200, json: colour ? { ...product, colour } : product }
+}
+
+/** The photo's main colour, or undefined if it can't be fetched by the same rules or decoded. */
+const colourOf = async (photoUrl: string | undefined, deps: ReadLinkDeps): Promise<string | undefined> => {
+  const url = checkUrl(photoUrl)
+  if (!url) return undefined
+  const photo = await safeFetchBytes(url, deps, deps.limits)
+  if (!photo.ok) return undefined
+  return photoColour(photo.bytes)
 }
