@@ -17,10 +17,17 @@ export interface Part {
 export interface Template {
   defaultSize: Size
   defaultMount: Mount
-  parts: (size: Size) => Part[]
+  /** The parts for this size. Only the lamp looks at the mount: a ceiling lamp hangs down. */
+  parts: (size: Size, mount?: Mount) => Part[]
 }
 
 const LEG_SHADE = -0.3
+
+function cylinder(y0: number, diameterX: number, diameterZ: number, height: number, shade?: number): Part {
+  const part: Part = { shape: 'cylinder', center: { x: 0, y: y0 + height / 2, z: 0 }, size: { width: diameterX, depth: diameterZ, height } }
+  if (shade !== undefined) part.shade = shade
+  return part
+}
 
 function box(x: number, y0: number, z: number, width: number, height: number, depth: number, shade?: number): Part {
   const part: Part = { shape: 'box', center: { x, y: y0 + height / 2, z }, size: { width, depth, height } }
@@ -57,6 +64,44 @@ function upholstered({ width, depth, height }: Size): Part[] {
     box(0, seat, -depth / 2 + back / 2, inner, height - seat, back),
     box(-armX, 0, 0, arm, armHeight, depth),
     box(armX, 0, 0, arm, armHeight, depth),
+  ]
+}
+
+/** Height per shelf: one shelf per ~35 cm of height, and at least one. */
+const SHELF_SPACING = 35
+
+export const shelfCount = (height: number): number => Math.max(1, Math.round(height / SHELF_SPACING))
+
+// Two sides and shelves from the bottom to the top, evenly spaced.
+function shelfParts({ width, depth, height }: Size): Part[] {
+  const side = Math.min(2, width * 0.1)
+  const count = shelfCount(height)
+  const board = Math.min(2, (height * 0.5) / count)
+  const step = count > 1 ? (height - board) / (count - 1) : 0
+  const sideX = width / 2 - side / 2
+  const shelves = Array.from({ length: count }, (_, i) => box(0, i * step, 0, width - 2 * side, board, depth))
+  return [box(-sideX, 0, 0, side, height, depth, LEG_SHADE), box(sideX, 0, 0, side, height, depth, LEG_SHADE), ...shelves]
+}
+
+// Base, pole and shade. A ceiling lamp is a pendant: a canopy at the top, a cord, and the shade at the bottom.
+function lampParts({ width, depth, height }: Size, mount: Mount = 'floor'): Part[] {
+  const shadeHeight = Math.min(30, height * 0.3)
+  const end = Math.min(3, height * 0.05)
+  const pole = Math.min(3, width * 0.1, depth * 0.1)
+  const stem = height - shadeHeight - end
+  if (mount === 'ceiling') {
+    const canopy = Math.min(12, width * 0.4, depth * 0.4)
+    return [
+      cylinder(0, width, depth, shadeHeight, 0.3),
+      cylinder(shadeHeight, pole, pole, stem, LEG_SHADE),
+      cylinder(height - end, canopy, canopy, end, LEG_SHADE),
+    ]
+  }
+  const base = Math.min(30, width * 0.6, depth * 0.6)
+  return [
+    cylinder(0, base, base, end, LEG_SHADE),
+    cylinder(end, pole, pole, stem, LEG_SHADE),
+    cylinder(height - shadeHeight, width, depth, shadeHeight, 0.3),
   ]
 }
 
@@ -134,6 +179,47 @@ export const templates = {
         box(0, 0, -depth / 2 + head / 2, width, height, head, -0.2),
       ]
     },
+  },
+  wardrobe: {
+    defaultSize: { width: 100, depth: 60, height: 200 },
+    defaultMount: 'floor',
+    parts: ({ width, depth, height }) => {
+      const door = Math.min(2, depth * 0.05)
+      const gap = Math.min(0.5, width * 0.01)
+      const doorWidth = (width - gap) / 2
+      const doorX = gap / 2 + doorWidth / 2
+      const doorZ = depth / 2 - door / 2
+      return [
+        box(0, 0, -door / 2, width, height, depth - door),
+        box(-doorX, 0, doorZ, doorWidth, height, door, 0.1),
+        box(doorX, 0, doorZ, doorWidth, height, door, 0.1),
+      ]
+    },
+  },
+  shelf: {
+    defaultSize: { width: 80, depth: 30, height: 140 },
+    defaultMount: 'floor',
+    parts: shelfParts,
+  },
+  'tv-unit': {
+    defaultSize: { width: 160, depth: 40, height: 50 },
+    defaultMount: 'floor',
+    parts: ({ width, depth, height }) => [box(0, 0, 0, width, height, depth)],
+  },
+  rug: {
+    defaultSize: { width: 200, depth: 140, height: 1 },
+    defaultMount: 'floor',
+    parts: ({ width, depth, height }) => [box(0, 0, 0, width, Math.min(1, height), depth)],
+  },
+  lamp: {
+    defaultSize: { width: 40, depth: 40, height: 160 },
+    defaultMount: 'floor',
+    parts: lampParts,
+  },
+  'wall-panel': {
+    defaultSize: { width: 60, depth: 3, height: 80 },
+    defaultMount: 'wall',
+    parts: ({ width, depth, height }) => [box(0, 0, 0, width, height, depth)],
   },
 } satisfies Record<string, Template>
 
