@@ -1,7 +1,9 @@
-// Draws a plan: one floor per room and one box per wall. Plan (x, y) maps to scene (x, z); +Y is up.
+// Draws a plan and its items: one floor per room, one box per wall, one group per item. Plan (x, y) maps to scene (x, z); +Y is up.
 import * as THREE from 'three'
 import { wallFades } from '../model/fade.ts'
+import type { Item } from '../model/item.ts'
 import { wallHeight, wallLength, wallsOf, type Plan, type Wall } from '../model/plan.ts'
+import { buildItem } from './items.ts'
 
 export const WALL_THICKNESS = 10 // cm
 const FADED_OPACITY = 0.15
@@ -10,6 +12,8 @@ export type HomeView = {
   group: THREE.Group
   floors: THREE.Mesh[]
   walls: { wall: Wall; mesh: THREE.Mesh<THREE.BoxGeometry, THREE.MeshStandardMaterial> }[]
+  /** One group per item, in the order given. */
+  items: THREE.Group[]
   /** Fades the walls the model says stand between this camera and the rooms; `null` fades none. */
   applyFade: (camera: THREE.Vector3 | null) => void
 }
@@ -35,11 +39,12 @@ const wallMesh = (wall: Wall, height: number) => {
   return mesh
 }
 
-export const buildHome = (plan: Plan): HomeView => {
+export const buildHome = (plan: Plan, items: Item[] = []): HomeView => {
   const group = new THREE.Group()
   const floors = plan.rooms.map((room) => floorMesh(room.corners))
   const walls = wallsOf(plan).map((wall) => ({ wall, mesh: wallMesh(wall, wallHeight(plan, wall)) }))
-  group.add(...floors, ...walls.map((w) => w.mesh))
+  const itemGroups = items.map(buildItem)
+  group.add(...floors, ...walls.map((w) => w.mesh), ...itemGroups)
 
   const applyFade = (camera: THREE.Vector3 | null) => {
     for (const { wall, mesh } of walls) {
@@ -48,5 +53,5 @@ export const buildHome = (plan: Plan): HomeView => {
       mesh.material.depthWrite = !faded
     }
   }
-  return { group, floors, walls, applyFade }
+  return { group, floors, walls, items: itemGroups, applyFade }
 }
