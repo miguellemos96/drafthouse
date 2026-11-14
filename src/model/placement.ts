@@ -14,7 +14,7 @@ export const templateFor = (templateId: string): Template =>
   Object.hasOwn(templates, templateId) ? templates[templateId as keyof typeof templates] : templates.box
 
 /** The parts of an item, in item space. */
-export const partsOf = (item: Item): Part[] => templateFor(item.templateId).parts(item.size)
+export const partsOf = (item: Item): Part[] => templateFor(item.templateId).parts(item.size, item.mount)
 
 /** The item's base origin in the home and its turn about +Y in radians (Three.js `rotation.y`). */
 export const itemPlacement = (item: Item): { origin: Point3; angle: number } => ({
