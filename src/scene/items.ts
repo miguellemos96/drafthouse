@@ -8,11 +8,17 @@ const CYLINDER_SEGMENTS = 24
 
 export type ItemMesh = THREE.Mesh<THREE.BoxGeometry | THREE.CylinderGeometry, THREE.MeshStandardMaterial>
 
-const partGeometry = ({ shape, size }: Part) => {
+const partGeometry = ({ shape, size, axis }: Part) => {
   if (shape === 'box') return new THREE.BoxGeometry(size.width, size.height, size.depth)
-  // A unit-radius cylinder scaled to the part's diameters, so an oval leg keeps its width and depth.
-  const geometry = new THREE.CylinderGeometry(0.5, 0.5, size.height, CYLINDER_SEGMENTS)
-  geometry.scale(size.width, 1, size.depth)
+  // A unit-diameter cylinder scaled to the part's diameters, so an oval leg keeps its width and depth.
+  const geometry = new THREE.CylinderGeometry(0.5, 0.5, 1, CYLINDER_SEGMENTS)
+  if (axis === 'z') {
+    // Built along Y with its diameters on X and Y, then laid down so its length runs along Z.
+    geometry.scale(size.width, size.depth, size.height)
+    geometry.rotateX(Math.PI / 2)
+  } else {
+    geometry.scale(size.width, size.height, size.depth)
+  }
   return geometry
 }
 

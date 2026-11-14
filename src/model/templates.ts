@@ -6,8 +6,13 @@
 import type { Mount, Size } from './item.ts'
 
 export interface Part {
-  /** A cylinder stands upright; its width and depth are its diameters along X and Z. */
+  /**
+   * A cylinder stands upright; its width and depth are its diameters along X and Z.
+   * With `axis: 'z'` it lies along Z instead, facing the front: its width and height are its
+   * diameters along X and Y, and its depth is its length.
+   */
   shape: 'box' | 'cylinder'
+  axis?: 'z'
   center: { x: number; y: number; z: number }
   size: Size
   /** Lightness change from the item's colour, from -1 (black) to 1 (white). Negative is darker. */
@@ -24,6 +29,12 @@ const LEG_SHADE = -0.3
 
 function box(x: number, y0: number, z: number, width: number, height: number, depth: number, shade?: number): Part {
   const part: Part = { shape: 'box', center: { x, y: y0 + height / 2, z }, size: { width, depth, height } }
+  if (shade !== undefined) part.shade = shade
+  return part
+}
+
+function cylinderAt(x: number, y0: number, z: number, width: number, height: number, depth: number, shade?: number): Part {
+  const part: Part = { shape: 'cylinder', center: { x, y: y0 + height / 2, z }, size: { width, depth, height } }
   if (shade !== undefined) part.shade = shade
   return part
 }
@@ -133,6 +144,150 @@ export const templates = {
         box(0, frame, frameZ, width - 2 * inset, mattress, frameDepth - 2 * inset, 0.3),
         box(0, 0, -depth / 2 + head / 2, width, height, head, -0.2),
       ]
+    },
+  },
+  toilet: {
+    defaultSize: { width: 38, depth: 68, height: 78 },
+    defaultMount: 'floor',
+    // Bowl and seat at the front, tank at the back (-Z), against the wall.
+    parts: ({ width, depth, height }) => {
+      const tank = Math.min(18, depth * 0.3)
+      const bowlDepth = depth - tank
+      const seatTop = Math.min(42, height * 0.55)
+      const seat = Math.min(3, seatTop * 0.1)
+      const bowlHeight = seatTop - seat
+      const bowlWidth = width * 0.85
+      const bowlZ = -depth / 2 + tank + bowlDepth / 2
+      return [
+        cylinderAt(0, 0, bowlZ, bowlWidth, bowlHeight, bowlDepth),
+        cylinderAt(0, bowlHeight, bowlZ, bowlWidth, seat, bowlDepth, 0.2),
+        box(0, bowlHeight / 2, -depth / 2 + tank / 2, width, height - bowlHeight / 2, tank),
+      ]
+    },
+  },
+  bidet: {
+    defaultSize: { width: 37, depth: 54, height: 40 },
+    defaultMount: 'floor',
+    parts: ({ width, depth, height }) => {
+      const rim = Math.min(15, height * 0.4)
+      return [
+        box(0, 0, 0, width * 0.6, height - rim, depth * 0.7, -0.1),
+        cylinderAt(0, height - rim, 0, width, rim, depth),
+      ]
+    },
+  },
+  sink: {
+    defaultSize: { width: 60, depth: 45, height: 85 },
+    defaultMount: 'floor',
+    // A basin on a pedestal.
+    parts: ({ width, depth, height }) => {
+      const basin = Math.min(18, height * 0.3)
+      const pedestal = Math.min(20, width * 0.4, depth * 0.6)
+      return [
+        cylinderAt(0, 0, 0, pedestal, height - basin, pedestal, -0.1),
+        box(0, height - basin, 0, width, basin, depth),
+      ]
+    },
+  },
+  'shower-tray': {
+    defaultSize: { width: 90, depth: 90, height: 4 },
+    defaultMount: 'floor',
+    parts: ({ width, depth, height }) => [box(0, 0, 0, width, Math.min(4, height), depth)],
+  },
+  bathtub: {
+    defaultSize: { width: 170, depth: 75, height: 55 },
+    defaultMount: 'floor',
+    // A low bottom between four full-height sides, so the hollow inside shows.
+    parts: ({ width, depth, height }) => {
+      const side = Math.min(8, width * 0.15, depth * 0.15)
+      const bottom = Math.min(5, height * 0.2)
+      const innerWidth = width - 2 * side
+      const sideX = width / 2 - side / 2
+      const sideZ = depth / 2 - side / 2
+      return [
+        box(0, 0, 0, innerWidth, bottom, depth - 2 * side, 0.2),
+        box(-sideX, 0, 0, side, height, depth),
+        box(sideX, 0, 0, side, height, depth),
+        box(0, 0, -sideZ, innerWidth, height, side),
+        box(0, 0, sideZ, innerWidth, height, side),
+      ]
+    },
+  },
+  hob: {
+    defaultSize: { width: 60, depth: 52, height: 5 },
+    defaultMount: 'on-item',
+    // A thin slab with 4 burner discs on top.
+    parts: ({ width, depth, height }) => {
+      const burner = Math.min(0.5, height * 0.2)
+      const slab = height - burner
+      const diameter = Math.min(20, width * 0.3, depth * 0.3)
+      const burners = [
+        [-1, -1],
+        [1, -1],
+        [-1, 1],
+        [1, 1],
+      ].map(([sx, sz]) => cylinderAt((sx * width) / 4, slab, (sz * depth) / 4, diameter, burner, diameter, -0.4))
+      return [box(0, 0, 0, width, slab, depth), ...burners]
+    },
+  },
+  oven: {
+    defaultSize: { width: 60, depth: 57, height: 60 },
+    defaultMount: 'floor',
+    // A body with a dark door panel on the front, below a strip for the controls.
+    parts: ({ width, depth, height }) => {
+      const door = Math.min(3, depth * 0.1)
+      return [
+        box(0, 0, -door / 2, width, height, depth - door),
+        box(0, 0, depth / 2 - door / 2, width, height * 0.8, door, -0.4),
+      ]
+    },
+  },
+  'cooker-hood': {
+    defaultSize: { width: 60, depth: 50, height: 90 },
+    defaultMount: 'wall',
+    // A canopy at the bottom and a narrower chimney above it, against the wall (-Z).
+    parts: ({ width, depth, height }) => {
+      const canopy = Math.min(15, height * 0.3)
+      const chimneyWidth = Math.min(30, width * 0.5)
+      const chimneyDepth = Math.min(25, depth * 0.5)
+      return [
+        box(0, 0, 0, width, canopy, depth),
+        box(0, canopy, -depth / 2 + chimneyDepth / 2, chimneyWidth, height - canopy, chimneyDepth),
+      ]
+    },
+  },
+  fridge: {
+    defaultSize: { width: 60, depth: 65, height: 185 },
+    defaultMount: 'floor',
+    // A body with a lower and an upper door on the front.
+    parts: ({ width, depth, height }) => {
+      const door = Math.min(4, depth * 0.1)
+      const gap = Math.min(1, height * 0.01)
+      const lower = (height - gap) * 0.35
+      const doorZ = depth / 2 - door / 2
+      return [
+        box(0, 0, -door / 2, width, height, depth - door),
+        box(0, 0, doorZ, width, lower, door, 0.1),
+        box(0, lower + gap, doorZ, width, height - lower - gap, door, 0.1),
+      ]
+    },
+  },
+  washer: {
+    // Also used for dryers: they are the same shape, and the name tells them apart.
+    defaultSize: { width: 60, depth: 60, height: 85 },
+    defaultMount: 'floor',
+    // A body with a round door on the front.
+    parts: ({ width, depth, height }) => {
+      const door = Math.min(3, depth * 0.1)
+      const diameter = Math.min(35, width * 0.6, height * 0.6)
+      const doorPart: Part = {
+        shape: 'cylinder',
+        axis: 'z',
+        center: { x: 0, y: height * 0.45, z: depth / 2 - door / 2 },
+        size: { width: diameter, depth: door, height: diameter },
+        shade: -0.4,
+      }
+      return [box(0, 0, -door / 2, width, height, depth - door), doorPart]
     },
   },
 } satisfies Record<string, Template>

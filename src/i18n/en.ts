@@ -15,6 +15,23 @@ export const en = {
   'file.error.not-a-home': 'That file is not a DraftHouse home.',
   'file.error.newer-version': 'That file was saved by a newer version of DraftHouse.',
   'file.error.unreadable': 'That file could not be opened.',
+  'template.box': 'Box',
+  'template.sofa': 'Sofa',
+  'template.armchair': 'Armchair',
+  'template.chair': 'Chair',
+  'template.table': 'Table',
+  'template.desk': 'Desk',
+  'template.bed': 'Bed',
+  'template.toilet': 'Toilet',
+  'template.bidet': 'Bidet',
+  'template.sink': 'Sink',
+  'template.shower-tray': 'Shower tray',
+  'template.bathtub': 'Bathtub',
+  'template.hob': 'Hob',
+  'template.oven': 'Oven',
+  'template.cooker-hood': 'Cooker hood',
+  'template.fridge': 'Fridge',
+  'template.washer': 'Washing machine or dryer',
 }
 
 export type StringKey = keyof typeof en
