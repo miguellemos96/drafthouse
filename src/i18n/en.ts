@@ -28,6 +28,16 @@ export const en = {
   'template.rug': 'Rug',
   'template.lamp': 'Lamp',
   'template.wall-panel': 'Wall panel',
+  'template.toilet': 'Toilet',
+  'template.bidet': 'Bidet',
+  'template.sink': 'Sink',
+  'template.shower-tray': 'Shower tray',
+  'template.bathtub': 'Bathtub',
+  'template.hob': 'Hob',
+  'template.oven': 'Oven',
+  'template.cooker-hood': 'Cooker hood',
+  'template.fridge': 'Fridge',
+  'template.washer': 'Washing machine or dryer',
 }
 
 export type StringKey = keyof typeof en

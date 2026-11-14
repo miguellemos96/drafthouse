@@ -71,6 +71,21 @@ describe('buildItem', () => {
     expect(size.z).toBeCloseTo(leg.size.depth)
   })
 
+  it('lays a cylinder with axis z along Z, sized to its part', () => {
+    const washer = sofa({ templateId: 'washer', size: { width: 60, depth: 60, height: 85 }, rotation: 0 })
+    const parts = partsOf(washer)
+    const index = parts.findIndex((p) => p.axis === 'z')
+    expect(index).toBeGreaterThanOrEqual(0)
+    const door = parts[index]
+    const mesh = meshes(buildItem(washer))[index]
+    expect(mesh.geometry).toBeInstanceOf(THREE.CylinderGeometry)
+    mesh.geometry.computeBoundingBox()
+    const size = mesh.geometry.boundingBox!.getSize(new THREE.Vector3())
+    expect(size.x).toBeCloseTo(door.size.width)
+    expect(size.y).toBeCloseTo(door.size.height)
+    expect(size.z).toBeCloseTo(door.size.depth)
+  })
+
   it('draws an unknown template as a box of the item size', () => {
     const group = buildItem(sofa({ templateId: 'unknown', rotation: 0 }))
     expect(meshes(group)).toHaveLength(1)
