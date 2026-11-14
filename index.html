@@ -12,6 +12,13 @@
       #file-buttons { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 1; display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; max-width: calc(100% - 32px); }
       #file-buttons button { font: inherit; padding: 4px 10px; }
       #file-message { flex-basis: 100%; margin: 0; padding: 6px 10px; background: #fff3cd; border: 1px solid #e0c36c; border-radius: 4px; text-align: center; }
+      #add-room { position: fixed; left: 12px; bottom: 12px; z-index: 1; display: grid; gap: 6px; width: 220px; max-width: calc(100% - 48px); padding: 10px 12px; background: rgba(255, 255, 255, 0.92); border: 1px solid #ccc; border-radius: 6px; }
+      #add-room h2 { margin: 0; font-size: 1rem; }
+      #add-room label { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+      #add-room input { font: inherit; width: 110px; padding: 2px 4px; }
+      #add-room input[aria-invalid="true"] { border-color: #c0392b; }
+      #add-room button { font: inherit; padding: 4px 10px; }
+      #add-room-message { margin: 0; padding: 6px 8px; background: #fff3cd; border: 1px solid #e0c36c; border-radius: 4px; }
     </style>
   </head>
   <body>
