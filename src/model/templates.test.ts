@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { templateIds, templates, type Part, type TemplateId } from './templates.ts'
-import type { Size } from './item.ts'
+import { shelfCount, templateIds, templates, type Part, type TemplateId } from './templates.ts'
+import type { Mount, Size } from './item.ts'
 import type { TemplateGuess } from '../../server/reader/extract.ts'
 import { LANGUAGES, STRINGS, type StringKey } from '../i18n/index.ts'
+
+const mounts: Mount[] = ['floor', 'wall', 'ceiling', 'on-item']
 
 const EPS = 1e-9
 
@@ -41,6 +43,18 @@ describe('templates', () => {
     }
   })
 
+  it('has the living-room, lighting, generic, bathroom, kitchen and laundry templates', () => {
+    expect([...templateIds].sort()).toEqual([
+      'armchair', 'bathtub', 'bed', 'bidet', 'box', 'chair', 'cooker-hood', 'desk', 'fridge', 'hob', 'lamp', 'oven', 'rug',
+      'shelf', 'shower-tray', 'sink', 'sofa', 'table', 'toilet', 'tv-unit', 'wall-panel', 'wardrobe', 'washer',
+    ])
+    expect(templates.lamp.defaultMount).toBe('floor')
+    expect(templates['wall-panel'].defaultMount).toBe('wall')
+    for (const id of ['wardrobe', 'shelf', 'tv-unit', 'rug'] as const) {
+      expect(templates[id].defaultMount).toBe('floor')
+    }
+  })
+
   it('has the bathroom, kitchen and laundry templates with their default mounts', () => {
     const mounts = {
       toilet: 'floor',
@@ -61,9 +75,76 @@ describe('templates', () => {
   })
 
   it('uses the same ids as the link reader guesses (checked by the typechecker)', () => {
-    // Every id except `box` must be a TemplateGuess, so a guessed id never names a template that is not there.
+    // Every id except `box` must be a TemplateGuess, so a guessed template is always a real one.
     const everyIdIsAGuess: Exclude<TemplateId, 'box'> extends TemplateGuess ? true : false = true
     expect(everyIdIsAGuess).toBe(true)
+  })
+
+  it('builds a wardrobe from a body and two doors', () => {
+    expect(templates.wardrobe.parts(templates.wardrobe.defaultSize)).toHaveLength(3)
+  })
+
+  it('gives a shelf two sides and 4 shelves, one more per ~35 cm of height', () => {
+    expect(templates.shelf.defaultSize.height).toBe(140)
+    expect(templates.shelf.parts(templates.shelf.defaultSize)).toHaveLength(2 + 4)
+    expect(shelfCount(140)).toBe(4)
+    expect(shelfCount(210)).toBe(6)
+    expect(shelfCount(10)).toBe(1)
+    const tall = templates.shelf.parts({ width: 80, depth: 30, height: 210 })
+    expect(tall).toHaveLength(2 + 6)
+  })
+
+  it('builds a TV unit from one low body', () => {
+    const parts = templates['tv-unit'].parts(templates['tv-unit'].defaultSize)
+    expect(parts).toHaveLength(1)
+    expect(templates['tv-unit'].defaultSize.height).toBeLessThan(templates['tv-unit'].defaultSize.width)
+  })
+
+  it('builds a rug from one flat box 1 cm high', () => {
+    const parts = templates.rug.parts(templates.rug.defaultSize)
+    expect(parts).toHaveLength(1)
+    expect(parts[0].shape).toBe('box')
+    expect(parts[0].size.height).toBe(1)
+    expect(templates.rug.defaultSize.height).toBe(1)
+  })
+
+  it('builds a wall panel from one thin box', () => {
+    const { defaultSize } = templates['wall-panel']
+    const parts = templates['wall-panel'].parts(defaultSize)
+    expect(parts).toHaveLength(1)
+    expect(parts[0].size.depth).toBeLessThan(parts[0].size.width)
+    expect(parts[0].size.depth).toBeLessThan(parts[0].size.height)
+  })
+
+  describe('lamp', () => {
+    const size = templates.lamp.defaultSize
+    const top = (p: Part) => p.center.y + p.size.height / 2
+    const bottom = (p: Part) => p.center.y - p.size.height / 2
+
+    for (const mount of ['floor', 'on-item'] as const) {
+      it(`stands a ${mount} lamp on its base, with the shade at the top`, () => {
+        const [base, pole, shade] = templates.lamp.parts(size, mount)
+        expect(bottom(base)).toBeCloseTo(0)
+        expect(bottom(pole)).toBeCloseTo(top(base))
+        expect(bottom(shade)).toBeCloseTo(top(pole))
+        expect(top(shade)).toBeCloseTo(size.height)
+      })
+    }
+
+    it('hangs a ceiling lamp from the top, with the shade at the bottom', () => {
+      const parts = templates.lamp.parts(size, 'ceiling')
+      expect(parts).toHaveLength(3)
+      const [shade, cord, canopy] = parts
+      expect(top(canopy)).toBeCloseTo(size.height)
+      expect(top(cord)).toBeCloseTo(bottom(canopy))
+      expect(top(shade)).toBeCloseTo(bottom(cord))
+      expect(bottom(shade)).toBeCloseTo(0)
+      expect(shade.size.width).toBeGreaterThan(cord.size.width)
+    })
+
+    it('uses the default mount when none is given', () => {
+      expect(templates.lamp.parts(size)).toEqual(templates.lamp.parts(size, 'floor'))
+    })
   })
 
   const cylinders = (parts: Part[]) => parts.filter((p) => p.shape === 'cylinder')
@@ -215,15 +296,17 @@ describe('templates', () => {
         })
       }
 
-      it('fits all parts inside the box for any size from 10 to 400 cm', () => {
+      it('fits all parts inside the box for any size from 10 to 400 cm, on every mount', () => {
         const lengths = [10, 17, 35, 52, 100, 173, 250, 333, 400]
         for (const width of lengths) {
           for (const depth of lengths) {
             for (const height of lengths) {
-              const size = { width, depth, height }
-              const parts = templates[id].parts(size)
-              expectValidParts(parts)
-              expectInsideSizeBox(parts, size)
+              for (const mount of mounts) {
+                const size = { width, depth, height }
+                const parts = templates[id].parts(size, mount)
+                expectValidParts(parts)
+                expectInsideSizeBox(parts, size)
+              }
             }
           }
         }
