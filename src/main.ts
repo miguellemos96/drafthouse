@@ -9,6 +9,7 @@ import { newSampleHome } from './model/sample.ts'
 import { createStore, type Store } from './model/store.ts'
 import { createCameraRig } from './scene/camera.ts'
 import { buildHome, type HomeView } from './scene/home.ts'
+import { mountAddRoom } from './ui/add-room.ts'
 import { mountFileButtons } from './ui/file-buttons.ts'
 import { applyLanguage, mountLanguageSwitcher } from './ui/language-switcher.ts'
 import { mountViewToggle } from './ui/view-toggle.ts'
@@ -62,10 +63,12 @@ const { camera, controls } = rig
 
 const toggle = mountViewToggle(document.body, rig.isTopView, rig.setTopView)
 const fileButtons = mountFileButtons(document.body, store)
+const addRoom = mountAddRoom(document.body, store)
 mountLanguageSwitcher(document.body, () => {
   applyLanguage()
   toggle.render()
   fileButtons.render()
+  addRoom.render()
 })
 
 const resize = () => {

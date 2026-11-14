@@ -38,6 +38,16 @@ export const en = {
   'template.cooker-hood': 'Cooker hood',
   'template.fridge': 'Fridge',
   'template.washer': 'Washing machine or dryer',
+  'room.defaultName': 'Room {n}',
+  'room.add.title': 'Add room',
+  'room.add.name': 'Name',
+  'room.add.width': 'Width (cm)',
+  'room.add.length': 'Length (cm)',
+  'room.add.height': 'Height (cm)',
+  'room.add.submit': 'Add room',
+  'room.add.error.width': 'The width must be from {min} to {max} cm.',
+  'room.add.error.length': 'The length must be from {min} to {max} cm.',
+  'room.add.error.height': 'The height must be from {min} to {max} cm.',
 }
 
 export type StringKey = keyof typeof en
