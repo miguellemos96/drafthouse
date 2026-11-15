@@ -52,6 +52,20 @@ export const en = {
   'history.redo': 'Redo',
   'history.undo.title': 'Undo ({keys})',
   'history.redo.title': 'Redo ({keys})',
+  'item.add.open': 'Add item',
+  'item.form.title': 'Add item',
+  'item.form.name': 'Name',
+  'item.form.template': 'Type',
+  'item.form.width': 'Width (cm)',
+  'item.form.depth': 'Depth (cm)',
+  'item.form.height': 'Height (cm)',
+  'item.form.colour': 'Colour',
+  'item.form.price': 'Price (optional)',
+  'item.form.currency': 'Currency',
+  'item.form.submit': 'Add',
+  'item.form.cancel': 'Cancel',
+  'item.form.error.size': 'Each size must be from {min} to {max} cm.',
+  'item.form.error.price': 'The price must be a number, 0 or more.',
 }
 
 export type StringKey = keyof typeof en

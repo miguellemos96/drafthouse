@@ -1,5 +1,5 @@
 // Entry point: the saved home (or the sample home) in 3D, with orbit controls, a top view,
-// autosave, undo and redo, and Export and Import.
+// autosave, undo and redo, Export and Import, and items you select, move and rotate.
 // Rooms, items and panels are added issue by issue (see docs/spec.md).
 import * as THREE from 'three'
 import { loadLanguage } from './i18n/index.ts'
@@ -7,10 +7,13 @@ import { loadHome, saveHome } from './model/autosave.ts'
 import { currentVersion } from './model/home.ts'
 import { newSampleHome } from './model/sample.ts'
 import { createStore, type Store } from './model/store.ts'
-import { createCameraRig } from './scene/camera.ts'
+import { createCameraRig, type CameraRig } from './scene/camera.ts'
 import { buildHome, type HomeView } from './scene/home.ts'
+import { createSelectionView } from './scene/selection.ts'
+import { mountAddItem } from './ui/add-item.ts'
 import { mountAddRoom } from './ui/add-room.ts'
 import { mountFileButtons } from './ui/file-buttons.ts'
+import { mountItemControls, type ItemControls } from './ui/item-controls.ts'
 import { applyLanguage, mountLanguageSwitcher } from './ui/language-switcher.ts'
 import { mountUndoRedo } from './ui/undo-redo.ts'
 import { mountViewToggle } from './ui/view-toggle.ts'
@@ -23,10 +26,16 @@ store.subscribe(saveHome)
 // For end-to-end tests and the browser console.
 declare global {
   interface Window {
-    drafthouse: { store: Store }
+    drafthouse: {
+      store: Store
+      rig: CameraRig
+      /** The id of the selected item, or `null`. */
+      selectedItemId: () => string | null
+      /** Where a point in the home shows on the page, in client pixels. */
+      toScreen: (x: number, y: number, z: number) => { x: number; y: number }
+    }
   }
 }
-window.drafthouse = { store }
 
 const container = document.getElementById('view')!
 const renderer = new THREE.WebGLRenderer({ antialias: true })
@@ -57,21 +66,45 @@ store.subscribe((next) => {
   })
   home = buildHome(next.plan, currentVersion(next).items)
   scene.add(home.group)
+  itemControls.refresh()
 })
 
 const rig = createCameraRig(renderer.domElement, home.group)
 const { camera, controls } = rig
 
+const itemControls: ItemControls = mountItemControls({
+  surface: container,
+  canvas: renderer.domElement,
+  camera,
+  controls,
+  store,
+  view: () => home,
+  selection: createSelectionView(scene),
+})
+
+window.drafthouse = {
+  store,
+  rig,
+  selectedItemId: itemControls.selectedId,
+  toScreen: (x, y, z) => {
+    const ndc = new THREE.Vector3(x, y, z).project(camera)
+    const rect = renderer.domElement.getBoundingClientRect()
+    return { x: rect.left + ((ndc.x + 1) / 2) * rect.width, y: rect.top + ((1 - ndc.y) / 2) * rect.height }
+  },
+}
+
 const toggle = mountViewToggle(document.body, rig.isTopView, rig.setTopView)
 const fileButtons = mountFileButtons(document.body, store)
 const addRoom = mountAddRoom(document.body, store)
 const undoRedo = mountUndoRedo(document.body, store)
+const addItem = mountAddItem(document.body, store, rig.lookPoint)
 mountLanguageSwitcher(document.body, () => {
   applyLanguage()
   toggle.render()
   fileButtons.render()
   addRoom.render()
   undoRedo.render()
+  addItem.render()
 })
 
 const resize = () => {

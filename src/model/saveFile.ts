@@ -77,7 +77,7 @@ const isRoom = (room: unknown) => {
 
 const isProduct = (product: unknown) =>
   isObject(product) &&
-  isString(product.url) &&
+  optional(product.url, isString) &&
   optional(product.price, isNumber) &&
   optional(product.currency, isString) &&
   optional(product.photoUrl, isString)
