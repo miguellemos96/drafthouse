@@ -1,5 +1,5 @@
 // Entry point: the saved home (or the sample home) in 3D, with orbit controls, a top view,
-// autosave, and Export and Import.
+// autosave, undo and redo, and Export and Import.
 // Rooms, items and panels are added issue by issue (see docs/spec.md).
 import * as THREE from 'three'
 import { loadLanguage } from './i18n/index.ts'
@@ -12,6 +12,7 @@ import { buildHome, type HomeView } from './scene/home.ts'
 import { mountAddRoom } from './ui/add-room.ts'
 import { mountFileButtons } from './ui/file-buttons.ts'
 import { applyLanguage, mountLanguageSwitcher } from './ui/language-switcher.ts'
+import { mountUndoRedo } from './ui/undo-redo.ts'
 import { mountViewToggle } from './ui/view-toggle.ts'
 
 loadLanguage(navigator.languages)
@@ -64,11 +65,13 @@ const { camera, controls } = rig
 const toggle = mountViewToggle(document.body, rig.isTopView, rig.setTopView)
 const fileButtons = mountFileButtons(document.body, store)
 const addRoom = mountAddRoom(document.body, store)
+const undoRedo = mountUndoRedo(document.body, store)
 mountLanguageSwitcher(document.body, () => {
   applyLanguage()
   toggle.render()
   fileButtons.render()
   addRoom.render()
+  undoRedo.render()
 })
 
 const resize = () => {

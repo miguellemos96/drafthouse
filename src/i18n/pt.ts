@@ -48,4 +48,8 @@ export const pt: Strings = {
   'room.add.error.width': 'A largura tem de estar entre {min} e {max} cm.',
   'room.add.error.length': 'O comprimento tem de estar entre {min} e {max} cm.',
   'room.add.error.height': 'A altura tem de estar entre {min} e {max} cm.',
+  'history.undo': 'Anular',
+  'history.redo': 'Refazer',
+  'history.undo.title': 'Anular ({keys})',
+  'history.redo.title': 'Refazer ({keys})',
 }

@@ -48,4 +48,8 @@ export const es: Strings = {
   'room.add.error.width': 'El ancho debe estar entre {min} y {max} cm.',
   'room.add.error.length': 'El largo debe estar entre {min} y {max} cm.',
   'room.add.error.height': 'El alto debe estar entre {min} y {max} cm.',
+  'history.undo': 'Deshacer',
+  'history.redo': 'Rehacer',
+  'history.undo.title': 'Deshacer ({keys})',
+  'history.redo.title': 'Rehacer ({keys})',
 }
