@@ -28,6 +28,13 @@ describe('toFile and fromFile', () => {
     expect(fromFile(toFile(empty))).toEqual({ ok: true, home: empty })
   })
 
+  it('keeps a price without a link (an item added through the form)', () => {
+    const home = furnished()
+    const item = { ...home.versions[0].items[0], id: 'lamp', product: { price: 30, currency: 'EUR' } }
+    const priced = addItem(home, item)
+    expect(fromFile(toFile(priced))).toEqual({ ok: true, home: priced })
+  })
+
   it.each([
     ['{', 'not-json'],
     ['', 'not-json'],

@@ -7,6 +7,8 @@ export type CameraRig = {
   controls: OrbitControls
   isTopView: () => boolean
   setTopView: (on: boolean) => void
+  /** The floor point under the screen centre, or null when the camera doesn't look down at the floor. */
+  lookPoint: () => { x: number; z: number } | null
 }
 
 export const createCameraRig = (dom: HTMLElement, home: THREE.Object3D): CameraRig => {
@@ -42,5 +44,12 @@ export const createCameraRig = (dom: HTMLElement, home: THREE.Object3D): CameraR
     controls.update()
   }
 
-  return { camera, controls, isTopView: () => top, setTopView }
+  const floor = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)
+  const lookPoint = () => {
+    const direction = camera.getWorldDirection(new THREE.Vector3())
+    const hit = new THREE.Ray(camera.position.clone(), direction).intersectPlane(floor, new THREE.Vector3())
+    return hit ? { x: hit.x, z: hit.z } : null
+  }
+
+  return { camera, controls, isTopView: () => top, setTopView, lookPoint }
 }

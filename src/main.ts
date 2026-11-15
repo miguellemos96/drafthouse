@@ -7,8 +7,9 @@ import { loadHome, saveHome } from './model/autosave.ts'
 import { currentVersion } from './model/home.ts'
 import { newSampleHome } from './model/sample.ts'
 import { createStore, type Store } from './model/store.ts'
-import { createCameraRig } from './scene/camera.ts'
+import { createCameraRig, type CameraRig } from './scene/camera.ts'
 import { buildHome, type HomeView } from './scene/home.ts'
+import { mountAddItem } from './ui/add-item.ts'
 import { mountAddRoom } from './ui/add-room.ts'
 import { mountFileButtons } from './ui/file-buttons.ts'
 import { applyLanguage, mountLanguageSwitcher } from './ui/language-switcher.ts'
@@ -22,7 +23,7 @@ store.subscribe(saveHome)
 // For end-to-end tests and the browser console.
 declare global {
   interface Window {
-    drafthouse: { store: Store }
+    drafthouse: { store: Store; rig?: CameraRig }
   }
 }
 window.drafthouse = { store }
@@ -60,15 +61,18 @@ store.subscribe((next) => {
 
 const rig = createCameraRig(renderer.domElement, home.group)
 const { camera, controls } = rig
+window.drafthouse.rig = rig
 
 const toggle = mountViewToggle(document.body, rig.isTopView, rig.setTopView)
 const fileButtons = mountFileButtons(document.body, store)
 const addRoom = mountAddRoom(document.body, store)
+const addItem = mountAddItem(document.body, store, rig.lookPoint)
 mountLanguageSwitcher(document.body, () => {
   applyLanguage()
   toggle.render()
   fileButtons.render()
   addRoom.render()
+  addItem.render()
 })
 
 const resize = () => {
