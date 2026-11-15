@@ -20,6 +20,9 @@ export type ItemFormValues = {
   /** No price means the item has none. */
   price?: number
   currency?: string
+  /** The product page, for an item added from a link. */
+  url?: string
+  photoUrl?: string
 }
 
 const inRange = (n: number) => Number.isFinite(n) && n >= ITEM_SIZE_LIMITS.min && n <= ITEM_SIZE_LIMITS.max
@@ -79,7 +82,8 @@ export const newItemPosition = (plan: Plan, point: FloorPoint | null): FloorPoin
 
 /**
  * The item for valid form values: in the room the camera is looking at, with its template's default
- * mount, standing at elevation 0 and unturned. A price (with its currency) is kept without a link.
+ * mount, standing at elevation 0 and unturned. The product keeps the link and photo, if any, and a
+ * price with its currency, which is kept without a link too.
  */
 export const newItem = (plan: Plan, point: FloorPoint | null, values: ItemFormValues & { id?: string }): Item => {
   const item: Item = {
@@ -93,10 +97,13 @@ export const newItem = (plan: Plan, point: FloorPoint | null, values: ItemFormVa
     rotation: 0,
     mount: templateFor(values.templateId).defaultMount,
   }
+  const product: Product = {}
+  if (values.url) product.url = values.url
   if (values.price !== undefined) {
-    const product: Product = { price: values.price }
+    product.price = values.price
     if (values.currency) product.currency = values.currency
-    item.product = product
   }
+  if (values.photoUrl) product.photoUrl = values.photoUrl
+  if (Object.keys(product).length > 0) item.product = product
   return item
 }

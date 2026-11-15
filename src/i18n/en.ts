@@ -66,6 +66,21 @@ export const en = {
   'item.form.cancel': 'Cancel',
   'item.form.error.size': 'Each size must be from {min} to {max} cm.',
   'item.form.error.price': 'The price must be a number, 0 or more.',
+  'item.form.chips': 'Sizes found on the page. Which is which?',
+  'item.form.chip.none': '—',
+  'item.form.confirm': 'I checked the kind of item and its three sizes',
+  'link.label': 'Product link',
+  'link.add': 'Add from link',
+  'link.loading': 'Reading the page…',
+  'link.error.invalid-url': 'That is not a web link (http or https).',
+  'link.error.blocked-address': 'That link points to a private or local address, so it was not read.',
+  'link.error.fetch-failed': 'The page could not be read.',
+  'link.error.too-large': 'The page is too big to read.',
+  'link.error.timeout': 'The page took too long to answer.',
+  'link.error.rate-limited': 'Too many links read in a short time. Wait a few minutes and try again.',
+  'link.error.nothing-found': 'Nothing about the product was found on the page.',
+  'item.panel.photo': 'Product photo',
+  'item.panel.link': 'Open the product page',
 }
 
 export type StringKey = keyof typeof en

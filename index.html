@@ -23,7 +23,7 @@
       #add-room-message { margin: 0; padding: 6px 8px; background: #fff3cd; border: 1px solid #e0c36c; border-radius: 4px; }
       #add-item { position: fixed; right: 12px; bottom: 12px; z-index: 1; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; max-width: calc(100% - 48px); }
       #add-item > button { font: inherit; padding: 4px 10px; }
-      #item-form { display: grid; gap: 6px; width: 240px; max-width: 100%; max-height: calc(100vh - 100px); overflow-y: auto; box-sizing: border-box; padding: 10px 12px; background: rgba(255, 255, 255, 0.92); border: 1px solid #ccc; border-radius: 6px; }
+      #item-form { display: grid; gap: 6px; width: 240px; max-width: 100%; max-height: calc(100vh - 150px); overflow-y: auto; box-sizing: border-box; padding: 10px 12px; background: rgba(255, 255, 255, 0.92); border: 1px solid #ccc; border-radius: 6px; }
       #item-form[hidden] { display: none; }
       #item-form h2 { margin: 0; font-size: 1rem; }
       #item-form label { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
@@ -34,6 +34,22 @@
       #item-form button { font: inherit; padding: 4px 10px; }
       #item-form-message { margin: 0; padding: 6px 8px; background: #fff3cd; border: 1px solid #e0c36c; border-radius: 4px; }
       #item-form-message[hidden] { display: none; }
+      #item-form [hidden] { display: none; }
+      #item-form-link-message { margin: 0; padding: 6px 8px; background: #fff3cd; border: 1px solid #e0c36c; border-radius: 4px; }
+      #item-form-chips { margin: 0; padding: 6px 8px; border: 1px solid #ccc; border-radius: 4px; display: flex; flex-wrap: wrap; gap: 6px; }
+      #item-form-chips legend { padding: 0 4px; font-size: 0.9rem; }
+      #item-form-chips label.chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 4px 2px 8px; background: #eef2f7; border: 1px solid #b8c4d4; border-radius: 12px; }
+      #item-form-chips select { width: auto; }
+      #item-form label.confirm { justify-content: flex-start; }
+      #item-form label.confirm input { width: auto; }
+      #item-form button:disabled { opacity: 0.6; }
+      #add-from-link { display: flex; gap: 6px; }
+      #add-from-link input { font: inherit; width: 220px; max-width: calc(100vw - 200px); padding: 2px 4px; }
+      #add-from-link button { font: inherit; padding: 4px 10px; }
+      #item-panel { position: fixed; top: 52px; right: 12px; z-index: 1; display: grid; gap: 6px; width: 180px; padding: 10px 12px; background: rgba(255, 255, 255, 0.92); border: 1px solid #ccc; border-radius: 6px; }
+      #item-panel[hidden], #item-panel [hidden] { display: none; }
+      #item-panel h2 { margin: 0; font-size: 1rem; overflow-wrap: anywhere; }
+      #item-panel img { width: 100%; max-height: 140px; object-fit: contain; background: #fff; border-radius: 4px; }
     </style>
   </head>
   <body>
