@@ -12,7 +12,8 @@ export interface Size {
 }
 
 export interface Product {
-  url: string
+  /** The product page. Absent for an item added without a link that still has a price. */
+  url?: string
   price?: number
   currency?: string
   photoUrl?: string
