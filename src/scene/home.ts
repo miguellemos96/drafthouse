@@ -10,6 +10,7 @@ const FADED_OPACITY = 0.15
 
 export type HomeView = {
   group: THREE.Group
+  /** One floor per room, in plan order, each named after its room's id. */
   floors: THREE.Mesh[]
   walls: { wall: Wall; mesh: THREE.Mesh<THREE.BoxGeometry, THREE.MeshStandardMaterial> }[]
   /** One group per item, in the order given. */
@@ -41,7 +42,11 @@ const wallMesh = (wall: Wall, height: number) => {
 
 export const buildHome = (plan: Plan, items: Item[] = []): HomeView => {
   const group = new THREE.Group()
-  const floors = plan.rooms.map((room) => floorMesh(room.corners))
+  const floors = plan.rooms.map((room) => {
+    const mesh = floorMesh(room.corners)
+    mesh.name = room.id
+    return mesh
+  })
   const walls = wallsOf(plan).map((wall) => ({ wall, mesh: wallMesh(wall, wallHeight(plan, wall)) }))
   const itemGroups = items.map(buildItem)
   group.add(...floors, ...walls.map((w) => w.mesh), ...itemGroups)
