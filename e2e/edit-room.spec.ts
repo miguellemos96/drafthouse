@@ -30,6 +30,7 @@ const click = async (page: Page, x: number, y: number, z: number) => {
 }
 
 test('select the second sample room, rename it, change its height and delete it', async ({ page }) => {
+  test.slow() // many rebuilds of the scene, rendered in software
   await ready(page)
   await page.getByRole('button', { name: 'Top view' }).click()
   await frames(page)
