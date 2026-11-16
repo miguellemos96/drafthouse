@@ -1,13 +1,22 @@
 // The item form: name, template, width, depth and height in cm, colour, and an optional price and currency.
 // Reusable: Add item opens it empty, and adding from a link (#34) opens it pre-filled.
 // The sizes follow the chosen template's default size, except the ones the user typed (or that came pre-filled).
+// Opened from a link, it also shows unlabeled numbers as chips, the read error if any, and a confirm box
+// that Add waits for (see src/model/linkProduct.ts).
 import { t, type StringKey } from '../i18n/index.ts'
 import type { Size } from '../model/item.ts'
+import { addAllowed, assignChip, chipSizes, type ChipAssignment, type ReadError } from '../model/linkProduct.ts'
 import { ITEM_SIZE_LIMITS, itemFormErrors, SIZE_FIELDS, type ItemFormField, type ItemFormValues, type SizeField } from '../model/newItem.ts'
 import { templateFor } from '../model/placement.ts'
 import { templateIds } from '../model/templates.ts'
 
-export type ItemFormPrefill = Partial<Omit<ItemFormValues, 'size'>> & { size?: Partial<Size> }
+export type ItemFormPrefill = Partial<Omit<ItemFormValues, 'size'>> & {
+  size?: Partial<Size>
+  /** Unlabeled numbers from the link, for the user to assign to sizes. */
+  chips?: number[]
+  /** Why the link couldn't be read; the form opens empty with the link kept. */
+  error?: ReadError
+}
 
 export type ItemForm = {
   element: HTMLFormElement
@@ -81,6 +90,26 @@ export function createItemForm(parent: HTMLElement, onSubmit: (values: ItemFormV
   message.id = 'item-form-message'
   message.setAttribute('role', 'alert')
 
+  // From a link: the read error, the chips and the confirm box.
+  const linkMessage = document.createElement('p')
+  linkMessage.id = 'item-form-link-message'
+  linkMessage.setAttribute('role', 'status')
+  const chipBox = document.createElement('fieldset')
+  chipBox.id = 'item-form-chips'
+  const chipLegend = document.createElement('legend')
+  const confirm = document.createElement('label')
+  confirm.className = 'confirm'
+  const confirmBox = document.createElement('input')
+  confirmBox.type = 'checkbox'
+  confirmBox.id = 'item-confirm'
+  const confirmText = document.createElement('span')
+  confirm.append(confirmBox, confirmText)
+
+  let link: { url: string; photoUrl?: string; error?: ReadError } | null = null
+  let chips: number[] = []
+  let assigned: ChipAssignment = []
+  let chipSelects: HTMLSelectElement[] = []
+
   let errors: ItemFormField[] = []
   // Sizes the user typed (or that came pre-filled) stay when the template changes.
   const typed = new Set<SizeField>()
@@ -91,6 +120,39 @@ export function createItemForm(parent: HTMLElement, onSubmit: (values: ItemFormV
   }
   for (const f of SIZE_FIELDS) sizes[f].input.addEventListener('input', () => typed.add(f))
   template.input.addEventListener('change', fillDefaultSizes)
+
+  const updateSubmit = () => {
+    submit.disabled = !addAllowed({ fromLink: link !== null, confirmed: confirmBox.checked })
+  }
+  confirmBox.addEventListener('change', updateSubmit)
+
+  const buildChips = () => {
+    chipBox.replaceChildren(chipLegend)
+    chipSelects = chips.map((value, index) => {
+      const label = document.createElement('label')
+      label.className = 'chip'
+      const number = document.createElement('span')
+      number.textContent = `${value} cm`
+      const select = document.createElement('select')
+      select.setAttribute('aria-label', `${value} cm`)
+      for (const option of ['', ...SIZE_FIELDS]) select.append(new Option('', option))
+      select.addEventListener('change', () => {
+        assigned = assignChip(assigned, index, (select.value || undefined) as SizeField | undefined)
+        const size = chipSizes(chips, assigned)
+        for (const f of SIZE_FIELDS) {
+          const v = size[f]
+          if (v === undefined) continue
+          typed.add(f)
+          sizes[f].input.value = String(v)
+        }
+        chipSelects.forEach((s, i) => (s.value = assigned[i] ?? ''))
+      })
+      label.append(number, select)
+      chipBox.append(label)
+      return select
+    })
+    chipBox.hidden = chips.length === 0
+  }
 
   const render = () => {
     title.textContent = t('item.form.title')
@@ -111,12 +173,26 @@ export function createItemForm(parent: HTMLElement, onSubmit: (values: ItemFormV
     message.hidden = errors.length === 0
     for (const f of SIZE_FIELDS) sizes[f].input.setAttribute('aria-invalid', String(errors.includes(f)))
     price.input.setAttribute('aria-invalid', String(errors.includes('price')))
+    linkMessage.textContent = link?.error ? t(`link.error.${link.error}` satisfies StringKey) : ''
+    linkMessage.hidden = !link?.error
+    chipLegend.textContent = t('item.form.chips')
+    for (const select of chipSelects) {
+      for (const option of select.options) option.textContent = option.value ? t(`item.form.${option.value as SizeField}` satisfies StringKey) : t('item.form.chip.none')
+    }
+    confirmText.textContent = t('item.form.confirm')
+    confirm.hidden = link === null
+    updateSubmit()
   }
   template.input.addEventListener('change', render) // the name's placeholder follows the template
 
   const open = (prefill: ItemFormPrefill = {}) => {
     errors = []
     typed.clear()
+    link = prefill.url === undefined ? null : { url: prefill.url, photoUrl: prefill.photoUrl, error: prefill.error }
+    chips = prefill.chips ?? []
+    assigned = chips.map(() => undefined)
+    buildChips()
+    confirmBox.checked = false
     name.input.value = prefill.name ?? ''
     template.input.value = prefill.templateId && templateIds.includes(prefill.templateId as never) ? prefill.templateId : DEFAULT_TEMPLATE
     for (const f of SIZE_FIELDS) {
@@ -146,6 +222,7 @@ export function createItemForm(parent: HTMLElement, onSubmit: (values: ItemFormV
     const read = (input: HTMLInputElement) => (input.value.trim() === '' ? Number.NaN : Number(input.value))
     const size = { width: read(sizes.width.input), depth: read(sizes.depth.input), height: read(sizes.height.input) }
     const priceValue = price.input.value.trim() === '' && price.input.validity.valid ? undefined : read(price.input)
+    if (!addAllowed({ fromLink: link !== null, confirmed: confirmBox.checked })) return
     errors = itemFormErrors({ size, price: priceValue })
     render()
     if (errors.length > 0) return
@@ -158,12 +235,27 @@ export function createItemForm(parent: HTMLElement, onSubmit: (values: ItemFormV
     }
     if (priceValue !== undefined) values.price = priceValue
     if (currencyValue) values.currency = currencyValue
+    if (link) values.url = link.url
+    if (link?.photoUrl) values.photoUrl = link.photoUrl
     close()
     onSubmit(values)
   })
 
   render()
-  form.append(title, name.label, template.label, ...SIZE_FIELDS.map((f) => sizes[f].label), colour.label, price.label, currency.label, buttons, message)
+  form.append(
+    title,
+    linkMessage,
+    name.label,
+    template.label,
+    chipBox,
+    ...SIZE_FIELDS.map((f) => sizes[f].label),
+    colour.label,
+    price.label,
+    currency.label,
+    confirm,
+    buttons,
+    message,
+  )
   parent.appendChild(form)
   return { element: form, open, close, isOpen: () => !form.hidden, render }
 }

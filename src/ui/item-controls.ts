@@ -27,6 +27,8 @@ export type ItemControlsOptions = {
   store: Store
   view: () => HomeView
   selection: SelectionView
+  /** Called with the selected item (or null) whenever the selection or the home changes. */
+  onSelect?: (item: Item | null) => void
 }
 
 export type ItemControls = {
@@ -40,7 +42,7 @@ const FLOOR = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)
 const isTyping = (target: EventTarget | null) =>
   target instanceof HTMLElement && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
 
-export const mountItemControls = ({ surface, canvas, camera, controls, store, view, selection }: ItemControlsOptions): ItemControls => {
+export const mountItemControls = ({ surface, canvas, camera, controls, store, view, selection, onSelect }: ItemControlsOptions): ItemControls => {
   let selected: string | null = null
   let gesture: Gesture | null = null
   const raycaster = new THREE.Raycaster()
@@ -74,6 +76,7 @@ export const mountItemControls = ({ surface, canvas, camera, controls, store, vi
   const show = (item: Item | null) => {
     for (const group of view().items) tintItem(group, group.name === item?.id)
     selection.show(item)
+    onSelect?.(item)
   }
 
   const select = (id: string | null) => {

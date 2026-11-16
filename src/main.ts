@@ -1,5 +1,5 @@
 // Entry point: the saved home (or the sample home) in 3D, with orbit controls, a top view,
-// autosave, undo and redo, Export and Import, and items you select, move and rotate.
+// autosave, undo and redo, Export and Import, items you select, move and rotate, and products added from a link.
 // Rooms, items and panels are added issue by issue (see docs/spec.md).
 import * as THREE from 'three'
 import { loadLanguage } from './i18n/index.ts'
@@ -14,6 +14,7 @@ import { mountAddItem } from './ui/add-item.ts'
 import { mountAddRoom } from './ui/add-room.ts'
 import { mountFileButtons } from './ui/file-buttons.ts'
 import { mountItemControls, type ItemControls } from './ui/item-controls.ts'
+import { mountItemPanel } from './ui/item-panel.ts'
 import { applyLanguage, mountLanguageSwitcher } from './ui/language-switcher.ts'
 import { mountUndoRedo } from './ui/undo-redo.ts'
 import { mountViewToggle } from './ui/view-toggle.ts'
@@ -72,6 +73,7 @@ store.subscribe((next) => {
 const rig = createCameraRig(renderer.domElement, home.group)
 const { camera, controls } = rig
 
+const itemPanel = mountItemPanel(document.body)
 const itemControls: ItemControls = mountItemControls({
   surface: container,
   canvas: renderer.domElement,
@@ -80,6 +82,7 @@ const itemControls: ItemControls = mountItemControls({
   store,
   view: () => home,
   selection: createSelectionView(scene),
+  onSelect: itemPanel.show,
 })
 
 window.drafthouse = {
@@ -105,6 +108,7 @@ mountLanguageSwitcher(document.body, () => {
   addRoom.render()
   undoRedo.render()
   addItem.render()
+  itemPanel.render()
 })
 
 const resize = () => {
