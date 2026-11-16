@@ -64,6 +64,13 @@ export const createSelectionView = (scene: THREE.Scene): SelectionView => {
   return { handle, show }
 }
 
+/** Tints a room's floor in the selection blue to mark the room selected, or clears the tint. */
+export const tintFloor = (floor: THREE.Mesh, on: boolean) => {
+  if (!(floor.material instanceof THREE.MeshStandardMaterial)) return
+  floor.material.emissive.setHex(on ? COLOUR : 0x000000)
+  floor.material.emissiveIntensity = on ? 0.45 : 1
+}
+
 /** Tints an item's parts to mark it selected, or clears the tint. */
 export const tintItem = (group: THREE.Object3D, on: boolean) => {
   group.traverse((object) => {
