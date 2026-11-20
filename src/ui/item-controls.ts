@@ -43,6 +43,8 @@ export type ItemControls = {
   duplicateSelected: () => void
   /** Removes the selected item and clears the selection. */
   deleteSelected: () => void
+  /** Clears the selection. */
+  deselect: () => void
 }
 
 const FLOOR = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)
@@ -214,5 +216,9 @@ export const mountItemControls = ({ surface, canvas, camera, controls, store, vi
     show(findItem(selected))
   }
 
-  return { selectedId: () => selected, refresh, duplicateSelected, deleteSelected }
+  const deselect = () => {
+    if (selected !== null) select(null)
+  }
+
+  return { selectedId: () => selected, refresh, duplicateSelected, deleteSelected, deselect }
 }

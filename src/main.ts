@@ -1,10 +1,12 @@
 // Entry point: the saved home (or the sample home) in 3D, with orbit controls, a top view,
-// autosave, undo and redo, Export and Import, items you select, move, rotate and edit, and products added from a link.
+// autosave, undo and redo, Export and Import, items you select, move, rotate and edit, products added from a link,
+// and doors and windows placed, dragged and edited in the top view.
 // Rooms, items and panels are added issue by issue (see docs/spec.md).
 import * as THREE from 'three'
 import { loadLanguage } from './i18n/index.ts'
 import { loadHome, saveHome } from './model/autosave.ts'
 import { currentVersion } from './model/home.ts'
+import type { Plan } from './model/plan.ts'
 import { newSampleHome } from './model/sample.ts'
 import { createStore, type Store } from './model/store.ts'
 import { createCameraRig, type CameraRig } from './scene/camera.ts'
@@ -16,6 +18,8 @@ import { mountFileButtons } from './ui/file-buttons.ts'
 import { mountItemControls, type ItemControls } from './ui/item-controls.ts'
 import { mountItemPanel } from './ui/item-panel.ts'
 import { applyLanguage, mountLanguageSwitcher } from './ui/language-switcher.ts'
+import { mountOpeningControls, type OpeningControls } from './ui/opening-controls.ts'
+import { mountOpeningPanel } from './ui/opening-panel.ts'
 import { mountUndoRedo } from './ui/undo-redo.ts'
 import { mountViewToggle } from './ui/view-toggle.ts'
 
@@ -32,6 +36,8 @@ declare global {
       rig: CameraRig
       /** The id of the selected item, or `null`. */
       selectedItemId: () => string | null
+      /** The id of the selected door or window, or `null`. */
+      selectedOpeningId: () => string | null
       /** Where a point in the home shows on the page, in client pixels. */
       toScreen: (x: number, y: number, z: number) => { x: number; y: number }
     }
@@ -56,19 +62,22 @@ scene.add(sun)
 let home: HomeView = buildHome(store.get().plan, currentVersion(store.get()).items)
 scene.add(home.group)
 
-// The scene redraws whenever the home changes.
-store.subscribe((next) => {
+const draw = (plan: Plan) => {
   scene.remove(home.group)
   home.group.traverse((object) => {
-    if (object instanceof THREE.Mesh) {
+    if (object instanceof THREE.Mesh || object instanceof THREE.Line) {
       object.geometry.dispose()
       object.material.dispose()
     }
   })
-  home = buildHome(next.plan, currentVersion(next).items)
+  home = buildHome(plan, currentVersion(store.get()).items)
   scene.add(home.group)
   itemControls.refresh()
-})
+  openingControls.refresh()
+}
+
+// The scene redraws whenever the home changes.
+store.subscribe((next) => draw(next.plan))
 
 const rig = createCameraRig(renderer.domElement, home.group)
 const { camera, controls } = rig
@@ -76,6 +85,23 @@ const { camera, controls } = rig
 const itemPanel = mountItemPanel(document.body, store, {
   duplicate: () => itemControls.duplicateSelected(),
   remove: () => itemControls.deleteSelected(),
+})
+const openingPanel = mountOpeningPanel(document.body, store, () => openingControls.deselect())
+// Mounted before the item controls, so a press on a door or window in the top view reaches it first.
+const openingControls: OpeningControls = mountOpeningControls({
+  parent: document.body,
+  surface: container,
+  canvas: renderer.domElement,
+  camera,
+  controls,
+  store,
+  view: () => home,
+  isTopView: rig.isTopView,
+  preview: (plan) => draw(plan ?? store.get().plan),
+  onSelect: (opening) => {
+    if (opening) itemControls.deselect()
+    openingPanel.show(opening)
+  },
 })
 const itemControls: ItemControls = mountItemControls({
   surface: container,
@@ -85,13 +111,17 @@ const itemControls: ItemControls = mountItemControls({
   store,
   view: () => home,
   selection: createSelectionView(scene),
-  onSelect: itemPanel.show,
+  onSelect: (item) => {
+    if (item) openingControls.deselect()
+    itemPanel.show(item)
+  },
 })
 
 window.drafthouse = {
   store,
   rig,
   selectedItemId: itemControls.selectedId,
+  selectedOpeningId: openingControls.selectedId,
   toScreen: (x, y, z) => {
     const ndc = new THREE.Vector3(x, y, z).project(camera)
     const rect = renderer.domElement.getBoundingClientRect()
@@ -99,7 +129,12 @@ window.drafthouse = {
   },
 }
 
-const toggle = mountViewToggle(document.body, rig.isTopView, rig.setTopView)
+const toggle = mountViewToggle(document.body, rig.isTopView, (on) => {
+  rig.setTopView(on)
+  // Doors and windows are placed and dragged in the top view only.
+  if (!on) openingControls.deselect()
+  openingControls.render()
+})
 const fileButtons = mountFileButtons(document.body, store)
 const addRoom = mountAddRoom(document.body, store)
 const undoRedo = mountUndoRedo(document.body, store)
@@ -112,6 +147,8 @@ mountLanguageSwitcher(document.body, () => {
   undoRedo.render()
   addItem.render()
   itemPanel.render()
+  openingControls.render()
+  openingPanel.render()
 })
 
 const resize = () => {
@@ -127,5 +164,6 @@ renderer.setAnimationLoop(() => {
   controls.update()
   // Looking straight down, every room is already open to view: nothing fades.
   home.applyFade(rig.isTopView() ? null : camera.position)
+  home.showArcs(rig.isTopView())
   renderer.render(scene, camera)
 })

@@ -1,5 +1,6 @@
 // The 2D plan: rooms as polygons and the walls derived from their edges.
 // Units are centimetres; areas are returned in square metres.
+import type { Opening } from './openings.ts'
 
 export type Point = { x: number; y: number }
 
@@ -10,7 +11,8 @@ export type Room = {
   corners: Point[]
 }
 
-export type Plan = { rooms: Room[] }
+/** `openings` is missing in homes saved before doors and windows; read it with `openingsOf`. */
+export type Plan = { rooms: Room[]; openings?: Opening[] }
 
 // One edge of one or more room polygons. A shared edge lists both rooms.
 export type Wall = { a: Point; b: Point; rooms: string[] }
@@ -55,8 +57,12 @@ export const roomArea = (room: Room): number => {
   return Math.abs(twice) / 2 / 10_000
 }
 
-// Moves every corner at `point`, in every room, to `to`. Returns a new plan.
+// Moves every corner at `point`, in every room, to `to`, and the ends of the openings' walls with it. Returns a new plan.
 export const moveCorner = (plan: Plan, point: Point, to: Point): Plan => ({
+  ...plan,
+  ...(plan.openings && {
+    openings: plan.openings.map((o) => ({ ...o, wall: { a: samePoint(o.wall.a, point) ? { ...to } : o.wall.a, b: samePoint(o.wall.b, point) ? { ...to } : o.wall.b } })),
+  }),
   rooms: plan.rooms.map((room) =>
     room.corners.some((c) => samePoint(c, point))
       ? createRoom({ ...room, corners: room.corners.map((c) => (samePoint(c, point) ? { ...to } : c)) })
