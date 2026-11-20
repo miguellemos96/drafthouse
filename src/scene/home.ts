@@ -2,10 +2,10 @@
 import * as THREE from 'three'
 import { wallFades } from '../model/fade.ts'
 import type { Item } from '../model/item.ts'
-import { wallHeight, wallLength, wallsOf, type Plan, type Wall } from '../model/plan.ts'
+import { WALL_THICKNESS, wallHeight, wallLength, wallsOf, type Plan, type Wall } from '../model/plan.ts'
 import { buildItem } from './items.ts'
 
-export const WALL_THICKNESS = 10 // cm
+export { WALL_THICKNESS }
 const FADED_OPACITY = 0.15
 
 export type HomeView = {
