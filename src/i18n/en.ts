@@ -81,6 +81,10 @@ export const en = {
   'link.error.nothing-found': 'Nothing about the product was found on the page.',
   'item.panel.photo': 'Product photo',
   'item.panel.link': 'Open the product page',
+  'item.panel.duplicate': 'Duplicate',
+  'item.panel.duplicate.title': 'Duplicate ({keys})',
+  'item.panel.delete': 'Delete',
+  'item.panel.delete.title': 'Delete (Delete key)',
 }
 
 export type StringKey = keyof typeof en

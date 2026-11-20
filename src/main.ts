@@ -1,5 +1,5 @@
 // Entry point: the saved home (or the sample home) in 3D, with orbit controls, a top view,
-// autosave, undo and redo, Export and Import, items you select, move and rotate, and products added from a link.
+// autosave, undo and redo, Export and Import, items you select, move, rotate and edit, and products added from a link.
 // Rooms, items and panels are added issue by issue (see docs/spec.md).
 import * as THREE from 'three'
 import { loadLanguage } from './i18n/index.ts'
@@ -73,7 +73,10 @@ store.subscribe((next) => {
 const rig = createCameraRig(renderer.domElement, home.group)
 const { camera, controls } = rig
 
-const itemPanel = mountItemPanel(document.body)
+const itemPanel = mountItemPanel(document.body, store, {
+  duplicate: () => itemControls.duplicateSelected(),
+  remove: () => itemControls.deleteSelected(),
+})
 const itemControls: ItemControls = mountItemControls({
   surface: container,
   canvas: renderer.domElement,
