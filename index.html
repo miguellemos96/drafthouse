@@ -56,6 +56,20 @@
       #item-panel .buttons { display: flex; gap: 8px; }
       #item-panel button { font: inherit; padding: 4px 10px; }
       #item-panel img { width: 100%; max-height: 140px; object-fit: contain; background: #fff; border-radius: 4px; }
+      #opening-tools { position: fixed; top: 92px; left: 12px; z-index: 1; display: flex; flex-wrap: wrap; gap: 8px; max-width: 260px; }
+      #opening-tools[hidden], #opening-tools [hidden] { display: none; }
+      #opening-tools button { font: inherit; padding: 4px 10px; }
+      #opening-tools button[aria-pressed="true"] { background: #2f80ed; color: #fff; border-color: #2f80ed; }
+      #opening-hint { flex-basis: 100%; margin: 0; padding: 6px 8px; background: rgba(255, 255, 255, 0.92); border: 1px solid #ccc; border-radius: 4px; }
+      #opening-panel { position: fixed; top: 52px; right: 12px; z-index: 1; display: grid; gap: 6px; width: 260px; max-width: calc(100vw - 24px); box-sizing: border-box; padding: 10px 12px; background: rgba(255, 255, 255, 0.92); border: 1px solid #ccc; border-radius: 6px; }
+      #opening-panel[hidden], #opening-panel [hidden] { display: none; }
+      #opening-panel h2 { margin: 0; font-size: 1rem; }
+      #opening-panel label { white-space: nowrap; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+      #opening-panel input { font: inherit; width: 90px; padding: 2px 4px; box-sizing: border-box; }
+      #opening-panel input[aria-invalid="true"] { border-color: #c0392b; }
+      #opening-panel-message { margin: 0; padding: 6px 8px; background: #fff3cd; border: 1px solid #e0c36c; border-radius: 4px; }
+      #opening-panel .buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+      #opening-panel button { font: inherit; padding: 4px 10px; }
     </style>
   </head>
   <body>
