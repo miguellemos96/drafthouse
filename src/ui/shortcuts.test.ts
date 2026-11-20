@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { historyShortcut, isMacPlatform } from './shortcuts.ts'
+import { historyShortcut, isMacPlatform, itemShortcut } from './shortcuts.ts'
 
 const key = (k: string, mods: { ctrl?: boolean; meta?: boolean; shift?: boolean; alt?: boolean } = {}) => ({
   key: k,
@@ -44,5 +44,24 @@ describe('isMacPlatform', () => {
     ['', false],
   ])('%s → %s', (platform, expected) => {
     expect(isMacPlatform(platform)).toBe(expected)
+  })
+})
+
+describe('itemShortcut', () => {
+  it.each([
+    [key('d', { ctrl: true }), false, 'duplicate'],
+    [key('D', { ctrl: true }), false, 'duplicate'],
+    [key('d', { meta: true }), true, 'duplicate'],
+    [key('d', { meta: true }), false, null],
+    [key('d', { ctrl: true }), true, null],
+    [key('d'), false, null],
+    [key('d', { ctrl: true, shift: true }), false, null],
+    [key('Delete'), false, 'delete'],
+    [key('Backspace'), false, 'delete'],
+    [key('Backspace'), true, 'delete'],
+    [key('Delete', { ctrl: true }), false, null],
+    [key('Delete', { alt: true }), false, null],
+  ] as const)('%j, mac %s → %s', (event, mac, expected) => {
+    expect(itemShortcut(event, mac)).toBe(expected)
   })
 })

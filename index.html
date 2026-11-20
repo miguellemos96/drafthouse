@@ -48,9 +48,15 @@
       #add-from-link { display: flex; gap: 6px; }
       #add-from-link input { font: inherit; width: 220px; max-width: calc(100vw - 200px); padding: 2px 4px; }
       #add-from-link button { font: inherit; padding: 4px 10px; }
-      #item-panel { position: fixed; top: 52px; right: 12px; z-index: 1; display: grid; gap: 6px; width: 180px; padding: 10px 12px; background: rgba(255, 255, 255, 0.92); border: 1px solid #ccc; border-radius: 6px; }
+      #item-panel { position: fixed; top: 52px; right: 12px; z-index: 1; display: grid; gap: 6px; width: 260px; max-width: calc(100vw - 24px); max-height: calc(100vh - 70px); overflow-y: auto; box-sizing: border-box; padding: 10px 12px; background: rgba(255, 255, 255, 0.92); border: 1px solid #ccc; border-radius: 6px; }
       #item-panel[hidden], #item-panel [hidden] { display: none; }
-      #item-panel h2 { margin: 0; font-size: 1rem; overflow-wrap: anywhere; }
+      #item-panel label { white-space: nowrap; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+      #item-panel input { font: inherit; width: 130px; padding: 2px 4px; box-sizing: border-box; }
+      #item-panel input[type="color"] { height: 28px; padding: 0 2px; }
+      #item-panel input[aria-invalid="true"] { border-color: #c0392b; }
+      #item-panel-message { margin: 0; padding: 6px 8px; background: #fff3cd; border: 1px solid #e0c36c; border-radius: 4px; }
+      #item-panel .buttons { display: flex; gap: 8px; }
+      #item-panel button { font: inherit; padding: 4px 10px; }
       #item-panel img { width: 100%; max-height: 140px; object-fit: contain; background: #fff; border-radius: 4px; }
     </style>
   </head>
