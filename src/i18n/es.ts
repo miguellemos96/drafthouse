@@ -8,6 +8,8 @@ export const es: Strings = {
   'language.pt': 'Português',
   'view.top': 'Vista superior',
   'view.orbit': 'Vista 3D',
+  'snap.label': 'Ajustar',
+  'snap.title': 'Ajustar a paredes, muebles y una cuadrícula de 5 cm; girar de 15° en 15° ({key}). Mantén Alt al arrastrar para mover libremente.',
   'version.asItIs': 'Como está',
   'file.export': 'Exportar',
   'file.import': 'Importar',

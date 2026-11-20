@@ -1,5 +1,5 @@
 // Entry point: the saved home (or the sample home) in 3D, with orbit controls, a top view,
-// autosave, undo and redo, Export and Import, items you select, move, rotate and edit, and products added from a link.
+// autosave, undo and redo, Export and Import, items you select, move (free or snapped), rotate and edit, and products added from a link.
 // Rooms, items and panels are added issue by issue (see docs/spec.md).
 import * as THREE from 'three'
 import { loadLanguage } from './i18n/index.ts'
@@ -10,11 +10,13 @@ import { createStore, type Store } from './model/store.ts'
 import { createCameraRig, type CameraRig } from './scene/camera.ts'
 import { buildHome, type HomeView } from './scene/home.ts'
 import { createSelectionView } from './scene/selection.ts'
+import { createSnapGuides } from './scene/snap-guides.ts'
 import { mountAddItem } from './ui/add-item.ts'
 import { mountAddRoom } from './ui/add-room.ts'
 import { mountFileButtons } from './ui/file-buttons.ts'
 import { mountItemControls, type ItemControls } from './ui/item-controls.ts'
 import { mountItemPanel } from './ui/item-panel.ts'
+import { mountSnapToggle } from './ui/snap-toggle.ts'
 import { applyLanguage, mountLanguageSwitcher } from './ui/language-switcher.ts'
 import { mountUndoRedo } from './ui/undo-redo.ts'
 import { mountViewToggle } from './ui/view-toggle.ts'
@@ -77,6 +79,7 @@ const itemPanel = mountItemPanel(document.body, store, {
   duplicate: () => itemControls.duplicateSelected(),
   remove: () => itemControls.deleteSelected(),
 })
+const snapToggle = mountSnapToggle(document.body)
 const itemControls: ItemControls = mountItemControls({
   surface: container,
   canvas: renderer.domElement,
@@ -85,6 +88,8 @@ const itemControls: ItemControls = mountItemControls({
   store,
   view: () => home,
   selection: createSelectionView(scene),
+  snap: snapToggle.isOn,
+  guides: createSnapGuides(scene),
   onSelect: itemPanel.show,
 })
 
@@ -112,6 +117,7 @@ mountLanguageSwitcher(document.body, () => {
   undoRedo.render()
   addItem.render()
   itemPanel.render()
+  snapToggle.render()
 })
 
 const resize = () => {

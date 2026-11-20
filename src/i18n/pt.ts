@@ -8,6 +8,8 @@ export const pt: Strings = {
   'language.pt': 'Português',
   'view.top': 'Vista de cima',
   'view.orbit': 'Vista 3D',
+  'snap.label': 'Encaixar',
+  'snap.title': 'Encaixar em paredes, móveis e numa grelha de 5 cm; rodar de 15° em 15° ({key}). Mantenha Alt ao arrastar para mover livremente.',
   'version.asItIs': 'Como está',
   'file.export': 'Exportar',
   'file.import': 'Importar',

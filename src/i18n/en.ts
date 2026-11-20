@@ -8,6 +8,8 @@ export const en = {
   'language.pt': 'Português',
   'view.top': 'Top view',
   'view.orbit': '3D view',
+  'snap.label': 'Snap',
+  'snap.title': 'Snap to walls, items and a 5 cm grid; rotate in 15° steps ({key}). Hold Alt while dragging to move freely.',
   'version.asItIs': 'As it is',
   'file.export': 'Export',
   'file.import': 'Import',
