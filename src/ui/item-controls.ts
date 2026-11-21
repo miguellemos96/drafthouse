@@ -32,6 +32,8 @@ export type ItemControlsOptions = {
   selection: SelectionView
   /** Called with the selected item (or null) whenever the selection or the home changes. */
   onSelect?: (item: Item | null) => void
+  /** View-only mode (phones): a tap selects an item to show it, a drag always orbits, and no key edits. */
+  viewOnly?: boolean
   mac?: boolean
 }
 
@@ -50,7 +52,7 @@ const FLOOR = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)
 const isTyping = (target: EventTarget | null) =>
   target instanceof HTMLElement && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
 
-export const mountItemControls = ({ surface, canvas, camera, controls, store, view, selection, onSelect, mac = isMacPlatform(navigator.platform) }: ItemControlsOptions): ItemControls => {
+export const mountItemControls = ({ surface, canvas, camera, controls, store, view, selection, onSelect, viewOnly = false, mac = isMacPlatform(navigator.platform) }: ItemControlsOptions): ItemControls => {
   let selected: string | null = null
   let gesture: Gesture | null = null
   const raycaster = new THREE.Raycaster()
@@ -105,6 +107,11 @@ export const mountItemControls = ({ surface, canvas, camera, controls, store, vi
 
   const onPointerDown = (event: PointerEvent) => {
     if (event.button !== 0 || !event.isPrimary || gesture) return
+    if (viewOnly) {
+      // Nothing to drag: the camera orbits, and a tap picks the item when the finger lifts.
+      gesture = { kind: 'press', x: event.clientX, y: event.clientY }
+      return
+    }
     aim(event)
     const point = floorPoint()
     const current = findItem(selected)
@@ -146,7 +153,9 @@ export const mountItemControls = ({ surface, canvas, camera, controls, store, vi
     gesture = null
     controls.enabled = true
     if (ended.kind === 'press') {
-      if (Math.hypot(event.clientX - ended.x, event.clientY - ended.y) < CLICK_SLOP) select(null)
+      if (Math.hypot(event.clientX - ended.x, event.clientY - ended.y) >= CLICK_SLOP) return
+      if (viewOnly) aim(event)
+      select(viewOnly ? pickItem() : null)
       return
     }
     const { item, preview: moved } = ended
@@ -180,6 +189,10 @@ export const mountItemControls = ({ surface, canvas, camera, controls, store, vi
   }
 
   const onKeyDown = (event: KeyboardEvent) => {
+    if (viewOnly) {
+      if (event.key === 'Escape') select(null)
+      return
+    }
     // Like the other shortcuts, these are ignored while typing in a field.
     const action = isTypingTarget(event.target) || isTyping(event.target) ? null : itemShortcut(event, mac)
     if (action) {

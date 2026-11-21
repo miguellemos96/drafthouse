@@ -85,4 +85,5 @@ export const es: Strings = {
   'item.panel.duplicate.title': 'Duplicar ({keys})',
   'item.panel.delete': 'Eliminar',
   'item.panel.delete.title': 'Eliminar (tecla Supr)',
+  'viewOnly.note': 'Usa un ordenador para editar esta casa',
 }

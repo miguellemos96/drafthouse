@@ -1,8 +1,9 @@
 // Entry point: the saved home (or the sample home) in 3D, with orbit controls, a top view,
 // autosave, undo and redo, Export and Import, items you select, move, rotate and edit, and products added from a link.
+// On a phone it is view only: look, orbit, switch the view and the language, Export, and tap an item to see it.
 // Rooms, items and panels are added issue by issue (see docs/spec.md).
 import * as THREE from 'three'
-import { loadLanguage } from './i18n/index.ts'
+import { loadLanguage, t } from './i18n/index.ts'
 import { loadHome, saveHome } from './model/autosave.ts'
 import { currentVersion } from './model/home.ts'
 import { newSampleHome } from './model/sample.ts'
@@ -12,6 +13,7 @@ import { buildHome, type HomeView } from './scene/home.ts'
 import { createSelectionView } from './scene/selection.ts'
 import { mountAddItem } from './ui/add-item.ts'
 import { mountAddRoom } from './ui/add-room.ts'
+import { currentDevice, isViewOnly } from './ui/device.ts'
 import { mountFileButtons } from './ui/file-buttons.ts'
 import { mountItemControls, type ItemControls } from './ui/item-controls.ts'
 import { mountItemPanel } from './ui/item-panel.ts'
@@ -21,6 +23,10 @@ import { mountViewToggle } from './ui/view-toggle.ts'
 
 loadLanguage(navigator.languages)
 applyLanguage()
+
+// Phones open the home to look at, with every editing control hidden (see src/ui/device.ts).
+// Decided once, when the page opens.
+const viewOnly = isViewOnly(currentDevice())
 
 const store = createStore(loadHome(newSampleHome))
 store.subscribe(saveHome)
@@ -32,6 +38,8 @@ declare global {
       rig: CameraRig
       /** The id of the selected item, or `null`. */
       selectedItemId: () => string | null
+      /** True when the app opened in view-only mode (a phone). */
+      viewOnly: boolean
       /** Where a point in the home shows on the page, in client pixels. */
       toScreen: (x: number, y: number, z: number) => { x: number; y: number }
     }
@@ -76,7 +84,10 @@ const { camera, controls } = rig
 const itemPanel = mountItemPanel(document.body, store, {
   duplicate: () => itemControls.duplicateSelected(),
   remove: () => itemControls.deleteSelected(),
-})
+}, { viewOnly })
+const selection = createSelectionView(scene)
+// No rotate handle where nothing can be turned.
+selection.handle.visible = !viewOnly
 const itemControls: ItemControls = mountItemControls({
   surface: container,
   canvas: renderer.domElement,
@@ -84,14 +95,16 @@ const itemControls: ItemControls = mountItemControls({
   controls,
   store,
   view: () => home,
-  selection: createSelectionView(scene),
+  selection,
   onSelect: itemPanel.show,
+  viewOnly,
 })
 
 window.drafthouse = {
   store,
   rig,
   selectedItemId: itemControls.selectedId,
+  viewOnly,
   toScreen: (x, y, z) => {
     const ndc = new THREE.Vector3(x, y, z).project(camera)
     const rect = renderer.domElement.getBoundingClientRect()
@@ -100,18 +113,22 @@ window.drafthouse = {
 }
 
 const toggle = mountViewToggle(document.body, rig.isTopView, rig.setTopView)
-const fileButtons = mountFileButtons(document.body, store)
-const addRoom = mountAddRoom(document.body, store)
-const undoRedo = mountUndoRedo(document.body, store)
-const addItem = mountAddItem(document.body, store, rig.lookPoint)
+const fileButtons = mountFileButtons(document.body, store, { canImport: !viewOnly })
+// Each panel has a `render` that redraws its text in the current language.
+const panels: { render: () => void }[] = [toggle, fileButtons, itemPanel]
+if (viewOnly) {
+  const note = document.createElement('p')
+  note.id = 'view-only-note'
+  note.setAttribute('role', 'note')
+  document.body.appendChild(note)
+  panels.push({ render: () => (note.textContent = t('viewOnly.note')) })
+} else {
+  panels.push(mountAddRoom(document.body, store), mountUndoRedo(document.body, store), mountAddItem(document.body, store, rig.lookPoint))
+}
+for (const panel of panels) panel.render()
 mountLanguageSwitcher(document.body, () => {
   applyLanguage()
-  toggle.render()
-  fileButtons.render()
-  addRoom.render()
-  undoRedo.render()
-  addItem.render()
-  itemPanel.render()
+  for (const panel of panels) panel.render()
 })
 
 const resize = () => {

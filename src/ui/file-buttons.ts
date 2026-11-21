@@ -1,12 +1,13 @@
 // Export and Import buttons: download the home as a .drafthouse.json file, or open one.
 // A file that can't be opened shows a message and leaves the current home as it was.
+// In view-only mode (phones) there is only Export.
 import { t, type StringKey } from '../i18n/index.ts'
 import { fileName, fromFile, toFile, type FileError } from '../model/saveFile.ts'
 import type { Store } from '../model/store.ts'
 
 export type FileButtons = { render: () => void }
 
-export function mountFileButtons(parent: HTMLElement, store: Store): FileButtons {
+export function mountFileButtons(parent: HTMLElement, store: Store, { canImport = true } = {}): FileButtons {
   const bar = document.createElement('div')
   bar.id = 'file-buttons'
 
@@ -64,7 +65,8 @@ export function mountFileButtons(parent: HTMLElement, store: Store): FileButtons
   })
 
   render()
-  bar.append(exportButton, importButton, input, message)
+  if (canImport) bar.append(exportButton, importButton, input, message)
+  else bar.append(exportButton)
   parent.appendChild(bar)
   return { render }
 }

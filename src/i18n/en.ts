@@ -85,6 +85,7 @@ export const en = {
   'item.panel.duplicate.title': 'Duplicate ({keys})',
   'item.panel.delete': 'Delete',
   'item.panel.delete.title': 'Delete (Delete key)',
+  'viewOnly.note': 'Use a computer to edit this home',
 }
 
 export type StringKey = keyof typeof en
