@@ -3,7 +3,7 @@ import { test, expect, devices, type Page } from '@playwright/test'
 // Phones are view only ("Devices" in docs/spec.md). The sample sofa stands at (200, 240), the table at (200, 100).
 
 // Every Pixel 7 setting except the browser type, which can't change inside a file.
-const { viewport, screen: phoneScreen, userAgent, deviceScaleFactor, isMobile, hasTouch } = devices['Pixel 7']
+const { viewport, userAgent, deviceScaleFactor, isMobile, hasTouch } = devices['Pixel 7']
 
 const ready = async (page: Page) => {
   await page.goto('/')
@@ -24,7 +24,7 @@ const changes = (page: Page) => page.evaluate(() => (window as unknown as { chan
 const EDITING = ['#add-room', '#history', '#undo', '#redo', '#add-item', '#add-item-button', '#add-from-link', '#import', '#item-panel input', '#item-duplicate', '#item-delete']
 
 test.describe('on a Pixel 7', () => {
-  test.use({ viewport, screen: phoneScreen, userAgent, deviceScaleFactor, isMobile, hasTouch })
+  test.use({ viewport, userAgent, deviceScaleFactor, isMobile, hasTouch })
 
   test('the home opens view only: the note shows and no editing control exists', async ({ page }) => {
     await ready(page)
