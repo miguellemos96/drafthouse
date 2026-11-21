@@ -2,6 +2,7 @@
 // The maths is in src/model/move.ts. A drag or a turn shows live in the scene and reaches the
 // store once, when it ends, so autosave and undo see one change per move.
 // Duplicate (Ctrl+D or ⌘D) and Delete (Delete or Backspace) act on the selected item, each as one change.
+// While an item is dragged, `onDrag` follows it, so the distances to the walls and the nearest item can show.
 import * as THREE from 'three'
 import { duplicateItem } from '../model/editItem.ts'
 import { addItem, currentVersion, removeItem, updateItem } from '../model/home.ts'
@@ -32,6 +33,10 @@ export type ItemControlsOptions = {
   selection: SelectionView
   /** Called with the selected item (or null) whenever the selection or the home changes. */
   onSelect?: (item: Item | null) => void
+  /** Called with the item where it is now on each step of a drag, and with null when the drag ends. */
+  onDrag?: (item: Item | null) => void
+  /** While this returns true, the pointer neither selects nor moves items (another tool has it). */
+  paused?: () => boolean
   mac?: boolean
 }
 
@@ -50,7 +55,19 @@ const FLOOR = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)
 const isTyping = (target: EventTarget | null) =>
   target instanceof HTMLElement && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
 
-export const mountItemControls = ({ surface, canvas, camera, controls, store, view, selection, onSelect, mac = isMacPlatform(navigator.platform) }: ItemControlsOptions): ItemControls => {
+export const mountItemControls = ({
+  surface,
+  canvas,
+  camera,
+  controls,
+  store,
+  view,
+  selection,
+  onSelect,
+  onDrag,
+  paused = () => false,
+  mac = isMacPlatform(navigator.platform),
+}: ItemControlsOptions): ItemControls => {
   let selected: string | null = null
   let gesture: Gesture | null = null
   const raycaster = new THREE.Raycaster()
@@ -104,7 +121,7 @@ export const mountItemControls = ({ surface, canvas, camera, controls, store, vi
   }
 
   const onPointerDown = (event: PointerEvent) => {
-    if (event.button !== 0 || !event.isPrimary || gesture) return
+    if (event.button !== 0 || !event.isPrimary || gesture || paused()) return
     aim(event)
     const point = floorPoint()
     const current = findItem(selected)
@@ -134,6 +151,7 @@ export const mountItemControls = ({ surface, canvas, camera, controls, store, vi
     const { item } = gesture
     if (gesture.kind === 'move') {
       gesture.preview = { ...item, position: dragPosition(item.position, gesture.pointerStart, point) }
+      onDrag?.(gesture.preview)
     } else {
       gesture.preview = { ...item, rotation: rotateByHandle(item.rotation, gesture.pointerStartAngle, pointerAngle(item.position, point)) }
     }
@@ -145,6 +163,7 @@ export const mountItemControls = ({ surface, canvas, camera, controls, store, vi
     const ended = gesture
     gesture = null
     controls.enabled = true
+    if (ended.kind === 'move') onDrag?.(null)
     if (ended.kind === 'press') {
       if (Math.hypot(event.clientX - ended.x, event.clientY - ended.y) < CLICK_SLOP) select(null)
       return
@@ -160,6 +179,7 @@ export const mountItemControls = ({ surface, canvas, camera, controls, store, vi
     const ended = gesture
     gesture = null
     controls.enabled = true
+    if (ended.kind === 'move') onDrag?.(null)
     if (ended.kind !== 'press') preview(ended.item)
   }
 

@@ -1,14 +1,18 @@
 // Entry point: the saved home (or the sample home) in 3D, with orbit controls, a top view,
 // autosave, undo and redo, Export and Import, items you select, move, rotate and edit, and products added from a link.
+// While an item is dragged, the distances to the walls and the nearest item show; the Measure tool measures between two points.
 // Rooms, items and panels are added issue by issue (see docs/spec.md).
 import * as THREE from 'three'
 import { loadLanguage } from './i18n/index.ts'
 import { loadHome, saveHome } from './model/autosave.ts'
+import { dragDistances } from './model/distances.ts'
 import { currentVersion } from './model/home.ts'
+import { wallsOf } from './model/plan.ts'
 import { newSampleHome } from './model/sample.ts'
 import { createStore, type Store } from './model/store.ts'
 import { createCameraRig, type CameraRig } from './scene/camera.ts'
 import { buildHome, type HomeView } from './scene/home.ts'
+import { createMeasureView, floorLine } from './scene/measures.ts'
 import { createSelectionView } from './scene/selection.ts'
 import { mountAddItem } from './ui/add-item.ts'
 import { mountAddRoom } from './ui/add-room.ts'
@@ -16,6 +20,7 @@ import { mountFileButtons } from './ui/file-buttons.ts'
 import { mountItemControls, type ItemControls } from './ui/item-controls.ts'
 import { mountItemPanel } from './ui/item-panel.ts'
 import { applyLanguage, mountLanguageSwitcher } from './ui/language-switcher.ts'
+import { mountTapeMeasure } from './ui/tape-measure.ts'
 import { mountUndoRedo } from './ui/undo-redo.ts'
 import { mountViewToggle } from './ui/view-toggle.ts'
 
@@ -77,6 +82,8 @@ const itemPanel = mountItemPanel(document.body, store, {
   duplicate: () => itemControls.duplicateSelected(),
   remove: () => itemControls.deleteSelected(),
 })
+const measures = createMeasureView(scene, container, camera, renderer.domElement)
+const tapeMeasure = mountTapeMeasure({ parent: document.body, surface: container, canvas: renderer.domElement, camera, view: () => home, measures })
 const itemControls: ItemControls = mountItemControls({
   surface: container,
   canvas: renderer.domElement,
@@ -86,6 +93,13 @@ const itemControls: ItemControls = mountItemControls({
   view: () => home,
   selection: createSelectionView(scene),
   onSelect: itemPanel.show,
+  paused: tapeMeasure.active,
+  onDrag: (item) => {
+    if (!item) return measures.showDrag([])
+    const home = store.get()
+    const found = dragDistances(item, wallsOf(home.plan), currentVersion(home).items)
+    measures.showDrag([...found.walls.map((line) => floorLine(line, line.side)), ...(found.item ? [floorLine(found.item, 'item')] : [])])
+  },
 })
 
 window.drafthouse = {
@@ -112,6 +126,7 @@ mountLanguageSwitcher(document.body, () => {
   undoRedo.render()
   addItem.render()
   itemPanel.render()
+  tapeMeasure.render()
 })
 
 const resize = () => {
@@ -128,4 +143,5 @@ renderer.setAnimationLoop(() => {
   // Looking straight down, every room is already open to view: nothing fades.
   home.applyFade(rig.isTopView() ? null : camera.position)
   renderer.render(scene, camera)
+  measures.update()
 })

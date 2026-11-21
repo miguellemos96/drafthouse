@@ -85,6 +85,9 @@ export const en = {
   'item.panel.duplicate.title': 'Duplicate ({keys})',
   'item.panel.delete': 'Delete',
   'item.panel.delete.title': 'Delete (Delete key)',
+  'measure.tool': 'Measure',
+  'measure.tool.title': 'Measure distances (M)',
+  'measure.hint': 'Click two points to measure between them. Esc ends.',
 }
 
 export type StringKey = keyof typeof en
