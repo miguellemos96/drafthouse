@@ -1,5 +1,5 @@
 // Entry point: the saved home (or the sample home) in 3D, with orbit controls, a top view,
-// autosave, undo and redo, Export and Import, items you select, move, rotate and edit, and products added from a link.
+// autosave, undo and redo, Export and Import, versions you switch, duplicate, rename and delete, items you select, move, rotate and edit, and products added from a link.
 // Rooms, items and panels are added issue by issue (see docs/spec.md).
 import * as THREE from 'three'
 import { loadLanguage } from './i18n/index.ts'
@@ -17,6 +17,7 @@ import { mountItemControls, type ItemControls } from './ui/item-controls.ts'
 import { mountItemPanel } from './ui/item-panel.ts'
 import { applyLanguage, mountLanguageSwitcher } from './ui/language-switcher.ts'
 import { mountUndoRedo } from './ui/undo-redo.ts'
+import { mountVersionBar } from './ui/version-bar.ts'
 import { mountViewToggle } from './ui/view-toggle.ts'
 
 loadLanguage(navigator.languages)
@@ -103,6 +104,7 @@ const toggle = mountViewToggle(document.body, rig.isTopView, rig.setTopView)
 const fileButtons = mountFileButtons(document.body, store)
 const addRoom = mountAddRoom(document.body, store)
 const undoRedo = mountUndoRedo(document.body, store)
+const versionBar = mountVersionBar(document.body, store)
 const addItem = mountAddItem(document.body, store, rig.lookPoint)
 mountLanguageSwitcher(document.body, () => {
   applyLanguage()
@@ -110,6 +112,7 @@ mountLanguageSwitcher(document.body, () => {
   fileButtons.render()
   addRoom.render()
   undoRedo.render()
+  versionBar.render()
   addItem.render()
   itemPanel.render()
 })

@@ -208,8 +208,12 @@ export const mountItemControls = ({ surface, canvas, camera, controls, store, vi
   window.addEventListener('pointercancel', onPointerCancel)
   window.addEventListener('keydown', onKeyDown)
 
+  let versionId = store.get().currentVersionId
   const refresh = () => {
-    // A home that no longer has the selected item (an import, say) clears the selection.
+    // Switching versions clears the selection, and so does a home that no longer has the selected item (an import, say).
+    const { currentVersionId } = store.get()
+    if (currentVersionId !== versionId) selected = null
+    versionId = currentVersionId
     if (selected !== null && !findItem(selected)) selected = null
     show(findItem(selected))
   }
