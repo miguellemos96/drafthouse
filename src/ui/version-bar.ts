@@ -1,6 +1,7 @@
 // The version bar: a selector of the home's versions, and Duplicate, Rename and Delete for the
 // current one. Each action is one store change, so it is autosaved and undone in one step.
 // Rename opens a name field in the bar; Delete asks for confirmation in the bar first.
+// With `canEdit: false` (phones, view only) the bar is just the selector.
 // See "Versions and prices" in docs/spec.md; the rules are in src/model/home.ts.
 import { t } from '../i18n/index.ts'
 import { canDeleteVersion, currentVersion, deleteVersion, duplicateVersion, renameVersion, switchVersion } from '../model/home.ts'
@@ -10,7 +11,7 @@ export type VersionBar = { render: () => void }
 
 type Mode = 'idle' | 'renaming' | 'confirming'
 
-export function mountVersionBar(parent: HTMLElement, store: Store): VersionBar {
+export function mountVersionBar(parent: HTMLElement, store: Store, { canEdit = true }: { canEdit?: boolean } = {}): VersionBar {
   const bar = document.createElement('div')
   bar.id = 'versions'
 
@@ -156,7 +157,7 @@ export function mountVersionBar(parent: HTMLElement, store: Store): VersionBar {
     render()
   })
   render()
-  bar.append(selectRow, actions, renameForm, confirm)
+  bar.append(selectRow, ...(canEdit ? [actions, renameForm, confirm] : []))
   parent.appendChild(bar)
   return { render }
 }

@@ -109,6 +109,7 @@ export const es: Strings = {
   'item.panel.duplicate.title': 'Duplicar ({keys})',
   'item.panel.delete': 'Eliminar',
   'item.panel.delete.title': 'Eliminar (tecla Supr)',
+  'viewOnly.note': 'Usa un ordenador para editar esta casa',
   'measure.tool': 'Medir',
   'measure.tool.title': 'Medir distancias (M)',
   'measure.hint': 'Haz clic en dos puntos para medir entre ellos. Esc termina.',

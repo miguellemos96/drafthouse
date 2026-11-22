@@ -109,6 +109,7 @@ export const en = {
   'item.panel.duplicate.title': 'Duplicate ({keys})',
   'item.panel.delete': 'Delete',
   'item.panel.delete.title': 'Delete (Delete key)',
+  'viewOnly.note': 'Use a computer to edit this home',
   'measure.tool': 'Measure',
   'measure.tool.title': 'Measure distances (M)',
   'measure.hint': 'Click two points to measure between them. Esc ends.',

@@ -3,9 +3,10 @@
 // rotate and edit, products added from a link, rooms you select to rename, change the height of or delete, and doors and windows
 // placed, dragged and edited in the top view. While an item is dragged, the distances to the walls and the nearest item show;
 // the Measure tool measures between two points.
+// On a phone it is view only: look, orbit, measure, switch the view, the version and the language, Export, and tap an item to see it.
 // Rooms, items and panels are added issue by issue (see docs/spec.md).
 import * as THREE from 'three'
-import { loadLanguage } from './i18n/index.ts'
+import { loadLanguage, t } from './i18n/index.ts'
 import { loadHome, saveHome } from './model/autosave.ts'
 import { dragDistances } from './model/distances.ts'
 import { currentVersion } from './model/home.ts'
@@ -19,6 +20,7 @@ import { createSelectionView } from './scene/selection.ts'
 import { createSnapGuides } from './scene/snap-guides.ts'
 import { mountAddItem } from './ui/add-item.ts'
 import { mountAddRoom } from './ui/add-room.ts'
+import { currentDevice, isViewOnly } from './ui/device.ts'
 import { mountFileButtons } from './ui/file-buttons.ts'
 import { mountItemControls, type ItemControls } from './ui/item-controls.ts'
 import { mountItemPanel } from './ui/item-panel.ts'
@@ -35,6 +37,10 @@ import { mountViewToggle } from './ui/view-toggle.ts'
 loadLanguage(navigator.languages)
 applyLanguage()
 
+// Phones open the home to look at, with every editing control hidden (see src/ui/device.ts).
+// Decided once, when the page opens.
+const viewOnly = isViewOnly(currentDevice())
+
 const store = createStore(loadHome(newSampleHome))
 store.subscribe(saveHome)
 // For end-to-end tests and the browser console.
@@ -45,6 +51,8 @@ declare global {
       rig: CameraRig
       /** The id of the selected item, or `null`. */
       selectedItemId: () => string | null
+      /** True when the app opened in view-only mode (a phone). */
+      viewOnly: boolean
       /** The id of the selected door or window, or `null`. */
       selectedOpeningId: () => string | null
       /** The id of the selected room, or `null`. */
@@ -100,29 +108,35 @@ const { camera, controls } = rig
 const itemPanel = mountItemPanel(document.body, store, {
   duplicate: () => itemControls.duplicateSelected(),
   remove: () => itemControls.deleteSelected(),
-})
+}, { viewOnly })
+const selection = createSelectionView(scene)
+// No rotate handle where nothing can be turned.
+selection.handle.visible = !viewOnly
 const measures = createMeasureView(scene, container, camera, renderer.domElement)
 const tapeMeasure = mountTapeMeasure({ parent: document.body, surface: container, canvas: renderer.domElement, camera, view: () => home, measures })
-const openingPanel = mountOpeningPanel(document.body, store, () => openingControls.deselect())
+// View only (phones): like Add room and Add item, these editing controls aren't created at all.
+const openingPanel = viewOnly ? null : mountOpeningPanel(document.body, store, () => openingControls.deselect())
 // Mounted before the item controls, so a press on a door or window in the top view reaches it first.
-const openingControls: OpeningControls = mountOpeningControls({
-  parent: document.body,
-  surface: container,
-  canvas: renderer.domElement,
-  camera,
-  controls,
-  store,
-  view: () => home,
-  isTopView: rig.isTopView,
-  paused: tapeMeasure.active,
-  preview: (plan) => draw(plan ?? store.get().plan),
-  onSelect: (opening) => {
-    if (opening) itemControls.deselect()
-    openingPanel.show(opening)
-  },
-})
-const snapToggle = mountSnapToggle(document.body)
-const roomPanel = mountRoomPanel(document.body, store)
+const openingControls: OpeningControls = viewOnly
+  ? { selectedId: () => null, deselect: () => {}, refresh: () => {}, render: () => {} }
+  : mountOpeningControls({
+      parent: document.body,
+      surface: container,
+      canvas: renderer.domElement,
+      camera,
+      controls,
+      store,
+      view: () => home,
+      isTopView: rig.isTopView,
+      paused: tapeMeasure.active,
+      preview: (plan) => draw(plan ?? store.get().plan),
+      onSelect: (opening) => {
+        if (opening) itemControls.deselect()
+        openingPanel?.show(opening)
+      },
+    })
+const snapToggle = viewOnly ? null : mountSnapToggle(document.body)
+const roomPanel = viewOnly ? null : mountRoomPanel(document.body, store)
 const itemControls: ItemControls = mountItemControls({
   surface: container,
   canvas: renderer.domElement,
@@ -130,8 +144,8 @@ const itemControls: ItemControls = mountItemControls({
   controls,
   store,
   view: () => home,
-  selection: createSelectionView(scene),
-  snap: snapToggle.isOn,
+  selection,
+  snap: () => snapToggle?.isOn() ?? false,
   guides: createSnapGuides(scene),
   // Items, rooms, and doors and windows: selecting one clears the others.
   onSelect: (item) => {
@@ -140,7 +154,7 @@ const itemControls: ItemControls = mountItemControls({
   },
   onSelectRoom: (room) => {
     if (room) openingControls.deselect()
-    roomPanel.show(room)
+    roomPanel?.show(room)
   },
   paused: tapeMeasure.active,
   onDrag: (item) => {
@@ -149,12 +163,14 @@ const itemControls: ItemControls = mountItemControls({
     const found = dragDistances(item, wallsOf(home.plan), currentVersion(home).items)
     measures.showDrag([...found.walls.map((line) => floorLine(line, line.side)), ...(found.item ? [floorLine(found.item, 'item')] : [])])
   },
+  viewOnly,
 })
 
 window.drafthouse = {
   store,
   rig,
   selectedItemId: itemControls.selectedId,
+  viewOnly,
   selectedOpeningId: openingControls.selectedId,
   selectedRoomId: itemControls.selectedRoomId,
   toScreen: (x, y, z) => {
@@ -170,25 +186,25 @@ const toggle = mountViewToggle(document.body, rig.isTopView, (on) => {
   if (!on) openingControls.deselect()
   openingControls.render()
 })
-const fileButtons = mountFileButtons(document.body, store)
-const addRoom = mountAddRoom(document.body, store)
-const undoRedo = mountUndoRedo(document.body, store)
-const versionBar = mountVersionBar(document.body, store)
-const addItem = mountAddItem(document.body, store, rig.lookPoint)
+const fileButtons = mountFileButtons(document.body, store, { canImport: !viewOnly })
+// On a phone, versions can be switched but not duplicated, renamed or deleted.
+const versionBar = mountVersionBar(document.body, store, { canEdit: !viewOnly })
+// Each panel has a `render` that redraws its text in the current language.
+const panels: { render: () => void }[] = [toggle, fileButtons, versionBar, itemPanel, tapeMeasure, openingControls]
+for (const panel of [openingPanel, snapToggle, roomPanel]) if (panel) panels.push(panel)
+if (viewOnly) {
+  const note = document.createElement('p')
+  note.id = 'view-only-note'
+  note.setAttribute('role', 'note')
+  document.body.appendChild(note)
+  panels.push({ render: () => (note.textContent = t('viewOnly.note')) })
+} else {
+  panels.push(mountAddRoom(document.body, store), mountUndoRedo(document.body, store), mountAddItem(document.body, store, rig.lookPoint))
+}
+for (const panel of panels) panel.render()
 mountLanguageSwitcher(document.body, () => {
   applyLanguage()
-  toggle.render()
-  fileButtons.render()
-  addRoom.render()
-  undoRedo.render()
-  versionBar.render()
-  addItem.render()
-  itemPanel.render()
-  tapeMeasure.render()
-  openingControls.render()
-  openingPanel.render()
-  snapToggle.render()
-  roomPanel.render()
+  for (const panel of panels) panel.render()
 })
 
 const resize = () => {

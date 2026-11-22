@@ -3,6 +3,7 @@
 // loaded straight from the shop, and a link that opens the product page in a new tab.
 // Each finished edit (on change or Enter, not on every keystroke) is one change through the store,
 // so it's autosaved and one undo step. A size out of 1–1000 cm shows a message and isn't saved.
+// In view-only mode (phones) it shows only the name, the photo and the link.
 import { t } from '../i18n/index.ts'
 import { isValidSize, resizeItem } from '../model/editItem.ts'
 import { updateItem } from '../model/home.ts'
@@ -16,9 +17,22 @@ export type ItemPanel = { show: (item: Item | null) => void; render: () => void 
 
 export type ItemPanelActions = { duplicate: () => void; remove: () => void }
 
-export function mountItemPanel(parent: HTMLElement, store: Store, actions: ItemPanelActions, mac = isMacPlatform(navigator.platform)): ItemPanel {
+export type ItemPanelOptions = {
+  /** View-only mode (phones): the panel shows the item's name and, for a product, its photo and link, with nothing to edit. */
+  viewOnly?: boolean
+  mac?: boolean
+}
+
+export function mountItemPanel(
+  parent: HTMLElement,
+  store: Store,
+  actions: ItemPanelActions,
+  { viewOnly = false, mac = isMacPlatform(navigator.platform) }: ItemPanelOptions = {},
+): ItemPanel {
   const panel = document.createElement('aside')
   panel.id = 'item-panel'
+  const title = document.createElement('h2')
+  title.id = 'item-panel-title'
   panel.hidden = true
 
   let current: Item | null = null
@@ -135,6 +149,7 @@ export function mountItemPanel(parent: HTMLElement, store: Store, actions: ItemP
     current = item
     panel.hidden = !item
     if (!item) return
+    title.textContent = item.name
     name.input.value = item.name
     for (const f of SIZE_FIELDS) {
       sizes[f].input.value = String(item.size[f])
@@ -157,7 +172,8 @@ export function mountItemPanel(parent: HTMLElement, store: Store, actions: ItemP
   }
 
   render()
-  panel.append(name.label, sizes.width.label, sizes.depth.label, sizes.height.label, colour.label, message, photo, link, buttons)
+  if (viewOnly) panel.append(title, photo, link)
+  else panel.append(name.label, sizes.width.label, sizes.depth.label, sizes.height.label, colour.label, message, photo, link, buttons)
   parent.appendChild(panel)
   return { show, render }
 }

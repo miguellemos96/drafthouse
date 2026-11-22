@@ -40,6 +40,8 @@ export type ItemControlsOptions = {
   guides?: SnapGuidesView
   /** Called with the selected item (or null) whenever the selection or the home changes. */
   onSelect?: (item: Item | null) => void
+  /** View-only mode (phones): a tap selects an item to show it, a drag always orbits, and no key edits. */
+  viewOnly?: boolean
   /** Called with the selected room (or null) whenever the selection or the home changes. */
   onSelectRoom?: (room: Room | null) => void
   /** Called with the item where it is now on each step of a drag, and with null when the drag ends. */
@@ -84,6 +86,7 @@ export const mountItemControls = ({
   onSelectRoom,
   onDrag,
   paused = () => false,
+  viewOnly = false,
   mac = isMacPlatform(navigator.platform),
 }: ItemControlsOptions): ItemControls => {
   let selected: string | null = null
@@ -162,6 +165,11 @@ export const mountItemControls = ({
 
   const onPointerDown = (event: PointerEvent) => {
     if (event.button !== 0 || !event.isPrimary || gesture || paused()) return
+    if (viewOnly) {
+      // Nothing to drag: the camera orbits, and a tap picks the item when the finger lifts.
+      gesture = { kind: 'press', x: event.clientX, y: event.clientY }
+      return
+    }
     aim(event)
     const point = floorPoint()
     const current = findItem(selected)
@@ -217,11 +225,12 @@ export const mountItemControls = ({
     guides?.show([])
     if (ended.kind === 'move') onDrag?.(null)
     if (ended.kind === 'press') {
-      // A click on a room's floor selects the room; anywhere else clears the selection.
-      if (Math.hypot(event.clientX - ended.x, event.clientY - ended.y) < CLICK_SLOP) {
-        aim(event)
-        selectRoom(pickRoom())
-      }
+      if (Math.hypot(event.clientX - ended.x, event.clientY - ended.y) >= CLICK_SLOP) return
+      aim(event)
+      // View only: a tap shows the item under it. Otherwise a click on a room's floor selects the room,
+      // and anywhere else clears the selection.
+      if (viewOnly) select(pickItem())
+      else selectRoom(pickRoom())
       return
     }
     const { item, preview: moved } = ended
@@ -257,6 +266,10 @@ export const mountItemControls = ({
   }
 
   const onKeyDown = (event: KeyboardEvent) => {
+    if (viewOnly) {
+      if (event.key === 'Escape') select(null)
+      return
+    }
     // Like the other shortcuts, these are ignored while typing in a field.
     const action = isTypingTarget(event.target) || isTyping(event.target) ? null : itemShortcut(event, mac)
     if (action) {
