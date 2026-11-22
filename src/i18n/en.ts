@@ -85,6 +85,11 @@ export const en = {
   'item.panel.duplicate.title': 'Duplicate ({keys})',
   'item.panel.delete': 'Delete',
   'item.panel.delete.title': 'Delete (Delete key)',
+  'item.panel.mount': 'Mount',
+  'item.panel.elevation': 'Height on the wall (cm)',
+  'item.mount.floor': 'Floor',
+  'item.mount.wall': 'Wall',
+  'item.mount.ceiling': 'Ceiling',
 }
 
 export type StringKey = keyof typeof en

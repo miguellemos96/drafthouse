@@ -85,4 +85,9 @@ export const es: Strings = {
   'item.panel.duplicate.title': 'Duplicar ({keys})',
   'item.panel.delete': 'Eliminar',
   'item.panel.delete.title': 'Eliminar (tecla Supr)',
+  'item.panel.mount': 'Montaje',
+  'item.panel.elevation': 'Altura en la pared (cm)',
+  'item.mount.floor': 'Suelo',
+  'item.mount.wall': 'Pared',
+  'item.mount.ceiling': 'Techo',
 }

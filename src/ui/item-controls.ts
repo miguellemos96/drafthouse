@@ -6,6 +6,7 @@ import * as THREE from 'three'
 import { duplicateItem } from '../model/editItem.ts'
 import { addItem, currentVersion, removeItem, updateItem } from '../model/home.ts'
 import type { FloorPoint, Item } from '../model/item.ts'
+import { placeOnMount } from '../model/mounts.ts'
 import { dragPosition, pointerAngle, rotateByHandle, stepRotation } from '../model/move.ts'
 import { itemPlacement } from '../model/placement.ts'
 import type { Store } from '../model/store.ts'
@@ -133,7 +134,8 @@ export const mountItemControls = ({ surface, canvas, camera, controls, store, vi
     if (!point) return
     const { item } = gesture
     if (gesture.kind === 'move') {
-      gesture.preview = { ...item, position: dragPosition(item.position, gesture.pointerStart, point) }
+      // The item follows the pointer on its mount: a wall item slides along the nearest wall, a ceiling item hangs from its room's ceiling.
+      gesture.preview = placeOnMount(store.get().plan, item, dragPosition(item.position, gesture.pointerStart, point))
     } else {
       gesture.preview = { ...item, rotation: rotateByHandle(item.rotation, gesture.pointerStartAngle, pointerAngle(item.position, point)) }
     }
@@ -150,8 +152,8 @@ export const mountItemControls = ({ surface, canvas, camera, controls, store, vi
       return
     }
     const { item, preview: moved } = ended
-    if (moved.position.x === item.position.x && moved.position.z === item.position.z && moved.rotation === item.rotation) return
-    store.set(updateItem(store.get(), item.id, { position: moved.position, rotation: moved.rotation }))
+    if (moved.position.x === item.position.x && moved.position.z === item.position.z && moved.rotation === item.rotation && moved.elevation === item.elevation) return
+    store.set(updateItem(store.get(), item.id, { position: moved.position, rotation: moved.rotation, elevation: moved.elevation }))
   }
 
   /** A cancelled drag puts the item back where it was and changes nothing. */

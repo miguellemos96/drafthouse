@@ -6,15 +6,19 @@
 import { t } from '../i18n/index.ts'
 import { isValidSize, resizeItem } from '../model/editItem.ts'
 import { updateItem } from '../model/home.ts'
-import type { Item } from '../model/item.ts'
+import type { Item, Mount } from '../model/item.ts'
 import { safeHttpUrl } from '../model/linkProduct.ts'
+import { changeMount, placeOnMount } from '../model/mounts.ts'
 import { ITEM_SIZE_LIMITS, SIZE_FIELDS, type SizeField } from '../model/newItem.ts'
 import type { Store } from '../model/store.ts'
 import { isMacPlatform } from './shortcuts.ts'
 
 export type ItemPanel = { show: (item: Item | null) => void; render: () => void }
 
-export type ItemPanelActions = { duplicate: () => void; remove: () => void }
+const PANEL_MOUNTS = ['floor', 'wall', 'ceiling'] as const
+type PanelMount = (typeof PANEL_MOUNTS)[number]
+
+export type ItemPanelActions ={ duplicate: () => void; remove: () => void }
 
 export function mountItemPanel(parent: HTMLElement, store: Store, actions: ItemPanelActions, mac = isMacPlatform(navigator.platform)): ItemPanel {
   const panel = document.createElement('aside')
@@ -44,6 +48,22 @@ export function mountItemPanel(parent: HTMLElement, store: Store, actions: ItemP
     }),
   ) as Record<SizeField, ReturnType<typeof field>>
   const colour = field('item-panel-colour', 'color')
+
+  // The mount, and for a wall item its height on the wall. Each change re-places the item by its mount's rule.
+  const mountLabel = document.createElement('label')
+  const mountText = document.createElement('span')
+  const mountSelect = document.createElement('select')
+  mountSelect.id = 'item-panel-mount'
+  const mountOptions = PANEL_MOUNTS.map((value) => {
+    const option = document.createElement('option')
+    option.value = value
+    return option
+  })
+  mountSelect.append(...mountOptions)
+  mountLabel.append(mountText, mountSelect)
+  const elevation = field('item-panel-elevation', 'number')
+  elevation.input.min = '0'
+  elevation.input.step = '1'
 
   const message = document.createElement('p')
   message.id = 'item-panel-message'
@@ -80,6 +100,12 @@ export function mountItemPanel(parent: HTMLElement, store: Store, actions: ItemP
     if (current) store.set(updateItem(store.get(), current.id, changes))
   }
 
+  /** Saves an edited item, re-placed by its mount's rule (a resized wall item stays flush and on its wall). */
+  const saveItem = (edited: Item) => {
+    const { position, rotation, elevation, mount, size } = placeOnMount(store.get().plan, edited)
+    save({ position, rotation, elevation, mount, size })
+  }
+
   /** Runs `commit` on change, and on Enter (which some browsers don't count as a change). */
   const onCommit = (input: HTMLInputElement, commit: () => void) => {
     input.addEventListener('change', commit)
@@ -110,9 +136,23 @@ export function mountItemPanel(parent: HTMLElement, store: Store, actions: ItemP
       const valid = isValidSize(value)
       input.setAttribute('aria-invalid', String(!valid))
       showSizeError()
-      if (valid && value !== current.size[f]) save({ size: resizeItem(current, { [f]: value }).size })
+      if (valid && value !== current.size[f]) saveItem(resizeItem(current, { [f]: value }))
     })
   }
+
+  mountSelect.addEventListener('change', () => {
+    const mount = mountSelect.value as Mount
+    if (current && mount !== current.mount) saveItem(changeMount(store.get().plan, current, mount))
+  })
+
+  onCommit(elevation.input, () => {
+    if (!current) return
+    const value = elevation.input.value.trim() === '' ? NaN : Number(elevation.input.value)
+    // Kept on the wall: from 0 to the wall height minus the item's height.
+    const placed = Number.isFinite(value) ? placeOnMount(store.get().plan, { ...current, elevation: value }) : current
+    elevation.input.value = String(placed.elevation)
+    if (placed.elevation !== current.elevation) saveItem(placed)
+  })
 
   colour.input.addEventListener('change', () => {
     if (current && colour.input.value !== current.colour) save({ colour: colour.input.value })
@@ -122,6 +162,9 @@ export function mountItemPanel(parent: HTMLElement, store: Store, actions: ItemP
     name.text.textContent = t('item.form.name')
     for (const f of SIZE_FIELDS) sizes[f].text.textContent = t(`item.form.${f}`)
     colour.text.textContent = t('item.form.colour')
+    mountText.textContent = t('item.panel.mount')
+    for (const option of mountOptions) option.textContent = t(`item.mount.${option.value as PanelMount}`)
+    elevation.text.textContent = t('item.panel.elevation')
     duplicate.textContent = t('item.panel.duplicate')
     duplicate.title = t('item.panel.duplicate.title', { keys: mac ? '⌘D' : 'Ctrl+D' })
     remove.textContent = t('item.panel.delete')
@@ -142,6 +185,10 @@ export function mountItemPanel(parent: HTMLElement, store: Store, actions: ItemP
     }
     message.hidden = true
     colour.input.value = item.colour
+    // An item on another item has no option here, so the select shows none.
+    mountSelect.value = item.mount
+    elevation.label.hidden = item.mount !== 'wall'
+    elevation.input.value = String(item.elevation)
 
     const url = safeHttpUrl(item.product?.url)
     const photoUrl = safeHttpUrl(item.product?.photoUrl)
@@ -157,7 +204,7 @@ export function mountItemPanel(parent: HTMLElement, store: Store, actions: ItemP
   }
 
   render()
-  panel.append(name.label, sizes.width.label, sizes.depth.label, sizes.height.label, colour.label, message, photo, link, buttons)
+  panel.append(name.label, sizes.width.label, sizes.depth.label, sizes.height.label, colour.label, mountLabel, elevation.label, message, photo, link, buttons)
   parent.appendChild(panel)
   return { show, render }
 }
