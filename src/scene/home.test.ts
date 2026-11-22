@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import * as THREE from 'three'
+import { addOpening, newOpening } from '../model/openings.ts'
+import { wallsOf, type Plan } from '../model/plan.ts'
 import { sampleHome } from '../model/sample.ts'
 import { buildHome, WALL_THICKNESS } from './home.ts'
 
@@ -12,6 +14,10 @@ describe('buildHome', () => {
     const living = box(home.floors[0])
     const actual = [living.min.x, living.max.x, living.min.y, living.max.y, living.min.z, living.max.z]
     ;[0, 400, 0, 0, 0, 300].forEach((v, i) => expect(actual[i]).toBeCloseTo(v))
+  })
+
+  it('names each floor after its room, so a click on it finds the room', () => {
+    expect(buildHome(sampleHome()).floors.map((f) => f.name)).toEqual(['living', 'bedroom'])
   })
 
   it('draws the shared wall once: 7 walls for two rooms side by side', () => {
@@ -48,5 +54,57 @@ describe('buildHome', () => {
     home.applyFade(new THREE.Vector3(350, 500, -1000))
     home.applyFade(null)
     expect(home.walls.every((w) => w.mesh.material.opacity === 1)).toBe(true)
+  })
+
+  describe('doors and windows', () => {
+    const withOpenings = (): Plan => {
+      let plan = sampleHome()
+      const shared = wallsOf(plan).find((w) => w.rooms.length === 2)!
+      plan = addOpening(plan, newOpening(plan, 'door', shared, 150, 'door')!)!
+      const front = wallsOf(plan).find((w) => w.a.y === 0 && w.b.y === 0 && w.rooms.includes('living'))!
+      return addOpening(plan, newOpening(plan, 'window', front, 200, 'window')!)!
+    }
+    const hits = (home: ReturnType<typeof buildHome>, from: THREE.Vector3, direction: THREE.Vector3) => {
+      home.group.updateMatrixWorld(true)
+      const ray = new THREE.Raycaster(from, direction.normalize())
+      return ray.intersectObjects(home.walls.map((w) => w.mesh))
+    }
+
+    it('makes one hole for a door on a wall shared by two rooms, seen from both rooms', () => {
+      const home = buildHome(withOpenings())
+      const shared = home.walls.filter((w) => w.wall.rooms.length === 2)
+      expect(shared).toHaveLength(3) // beside, above, beside
+      expect(shared.filter((w) => w.opening === 'door')).toHaveLength(1)
+      // Through the middle of the door, 100 cm up: nothing in the way, from either room.
+      expect(hits(home, new THREE.Vector3(200, 100, 150), new THREE.Vector3(1, 0, 0)).filter((h) => h.point.x < 410)).toHaveLength(0)
+      expect(hits(home, new THREE.Vector3(600, 100, 150), new THREE.Vector3(-1, 0, 0)).filter((h) => h.point.x > 390)).toHaveLength(0)
+      // Above the door, at 230 cm, the lintel is there.
+      expect(hits(home, new THREE.Vector3(200, 230, 150), new THREE.Vector3(1, 0, 0))[0].point.x).toBeCloseTo(400 - WALL_THICKNESS / 2)
+    })
+
+    it('gives a window a hole with a thin pane, and walls under and over it', () => {
+      const home = buildHome(withOpenings())
+      expect(home.panes).toHaveLength(1)
+      home.group.updateMatrixWorld(true)
+      const pane = box(home.panes[0].mesh)
+      expect([pane.min.x, pane.max.x, pane.min.y, pane.max.y].map(Math.round)).toEqual([140, 260, 90, 210])
+      expect(pane.max.z - pane.min.z).toBeLessThan(WALL_THICKNESS)
+      expect(home.walls.filter((w) => w.opening === 'window')).toHaveLength(2)
+      expect(hits(home, new THREE.Vector3(200, 150, 100), new THREE.Vector3(0, 0, -1))).toHaveLength(0)
+      expect(hits(home, new THREE.Vector3(200, 50, 100), new THREE.Vector3(0, 0, -1))).toHaveLength(1)
+    })
+
+    it('draws a door swing arc on the floor, shown only when asked (the top view)', () => {
+      const home = buildHome(withOpenings())
+      expect(home.arcs).toHaveLength(1)
+      const arc = home.arcs[0].object
+      expect(arc.visible).toBe(false)
+      home.showArcs(true)
+      expect(arc.visible).toBe(true)
+      const b = box(arc)
+      expect(b.max.y - b.min.y).toBeLessThan(2) // flat
+      expect(b.max.x - b.min.x).toBeCloseTo(80) // a quarter circle as wide as the door
+      expect(b.max.z - b.min.z).toBeCloseTo(80)
+    })
   })
 })

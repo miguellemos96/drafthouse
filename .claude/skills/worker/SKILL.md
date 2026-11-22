@@ -1,6 +1,6 @@
 ---
 name: worker
-description: Work one GitHub issue unattended, from reading it to a PR with green checks, or park it with a question. Started by factory-tick as `/worker <N>`, or `/worker <N> fix <PR-url>` after a FAIL verdict.
+description: Work one GitHub issue unattended, from reading it to a PR with green checks, or park it with a question. Started by factory-tick as `/worker <N>`, `/worker <N> fix <PR-url>` after a FAIL verdict, or `/worker <N> conflicts <PR-url>` when the PR conflicts with main.
 disable-model-invocation: true
 ---
 
@@ -58,6 +58,18 @@ Run the app only through Playwright: `npm run e2e`, plus `npm run e2e:scratch` f
 ## Fix mode (`/worker N fix <PR-url>`)
 
 Read the newest `## Verifier:` comment on the PR. Treat each point as a claim to check. Fix the points the issue backs; park on any point that asks for more than the issue does. Work on a detached `origin/<head branch>`, push with `HEAD:<head branch>`, then wait for checks as in step 5.
+
+## Conflicts mode (`/worker N conflicts <PR-url>`)
+
+The PR conflicts with `main`, usually because another factory PR touching the same files merged first. Bring `main` into the branch so both features work together. Don't change what either feature does.
+
+1. `git switch --detach origin/<head branch>`, then `git merge --no-ff origin/main`. Merge; never rebase, so there's no force push and the history the verifier saw stays.
+2. Resolve each conflict by keeping both sides: both imports, both fields, both panels, both returned functions, both sets of strings. Then read the code where the two features meet, even where git merged cleanly, for clashes git can't see. Examples: one side replacing an object the other side extends, two key handlers for the same key, two panels in the same spot, or a renamed function the other side still calls.
+3. Run every check from `CLAUDE.md`, and `npm run e2e`. Then write a scratch spec in `.factory-tmp/e2e/` for where the two features meet, such as a shortcut from one feature while the other's selection is active, and run `npm run e2e:scratch`. Never change an existing test to make the merge pass.
+4. Commit with the message `Merge main into <head branch>`, plus a line per resolved file saying what was kept. Push with `git push origin HEAD:<head branch>`, then wait for checks as in step 5.
+5. Comment on the PR, starting with `## Merged main`: list each conflicted file, how you resolved it, and the scratch check you ran. The verifier then checks the new head as usual.
+
+**Park instead** when keeping both sides isn't possible: both features change the same behaviour in different ways, or a check fails because they really disagree. Don't push a half-merge. Comment on the PR, starting with `## Conflicts: parked`, with the files and the decision the human needs to make. The factory leaves the PR alone after that until the human resolves it, or deletes that comment to let it try again.
 
 ## 6. Result
 

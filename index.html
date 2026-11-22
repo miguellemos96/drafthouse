@@ -13,7 +13,7 @@
       #file-buttons button { font: inherit; padding: 4px 10px; }
       #history { position: fixed; top: 52px; left: 12px; z-index: 1; display: flex; gap: 8px; }
       #history button { font: inherit; padding: 4px 10px; }
-      #versions { position: fixed; top: 92px; left: 12px; z-index: 1; display: grid; gap: 6px; width: 300px; max-width: calc(100vw - 24px); box-sizing: border-box; padding: 8px 10px; background: rgba(255, 255, 255, 0.92); border: 1px solid #ccc; border-radius: 6px; }
+      #versions { position: fixed; top: 52px; left: 50%; transform: translateX(-50%); z-index: 1; display: grid; gap: 6px; width: 300px; max-width: calc(100vw - 24px); box-sizing: border-box; padding: 8px 10px; background: rgba(255, 255, 255, 0.92); border: 1px solid #ccc; border-radius: 6px; }
       #versions label, #versions .row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
       #versions select, #versions input { font: inherit; flex: 1; min-width: 0; padding: 2px 4px; }
       #versions input[aria-invalid="true"] { border-color: #c0392b; }
@@ -23,6 +23,8 @@
       #version-confirm { display: grid; gap: 6px; padding: 6px 8px; background: #fff3cd; border: 1px solid #e0c36c; border-radius: 4px; }
       #version-confirm p { margin: 0; }
       #versions [hidden], #versions .buttons[hidden] { display: none; }
+      #snap-toggle { position: fixed; top: 92px; left: 12px; z-index: 1; font: inherit; padding: 4px 10px; }
+      #snap-toggle[aria-pressed="true"] { background: #2f80ed; color: #fff; border: 1px solid #1d5fbf; border-radius: 3px; }
       #file-message { flex-basis: 100%; margin: 0; padding: 6px 10px; background: #fff3cd; border: 1px solid #e0c36c; border-radius: 4px; text-align: center; }
       #add-room { position: fixed; left: 12px; bottom: 12px; z-index: 1; display: grid; gap: 6px; width: 220px; max-width: calc(100% - 48px); padding: 10px 12px; background: rgba(255, 255, 255, 0.92); border: 1px solid #ccc; border-radius: 6px; }
       #add-room h2 { margin: 0; font-size: 1rem; }
@@ -66,6 +68,40 @@
       #item-panel .buttons { display: flex; gap: 8px; }
       #item-panel button { font: inherit; padding: 4px 10px; }
       #item-panel img { width: 100%; max-height: 140px; object-fit: contain; background: #fff; border-radius: 4px; }
+      #tape-measure { position: fixed; top: 132px; left: 12px; z-index: 1; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; max-width: calc(100% - 24px); }
+      #tape-measure button { font: inherit; padding: 4px 10px; }
+      #tape-measure button[aria-pressed="true"] { background: #c0392b; color: #fff; border-color: #c0392b; }
+      #tape-measure-hint { position: absolute; left: 100%; top: 0; margin: 0 0 0 8px; white-space: nowrap; padding: 4px 8px; background: rgba(255, 255, 255, 0.92); border: 1px solid #ccc; border-radius: 4px; font-size: 0.9rem; }
+      #tape-measure-hint[hidden] { display: none; }
+      #measures { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+      .measure-label { position: absolute; transform: translate(-50%, -50%); padding: 1px 5px; background: rgba(255, 255, 255, 0.92); border: 1px solid #2f80ed; border-radius: 3px; font-size: 0.8rem; white-space: nowrap; }
+      .measure-label[data-kind="item"] { border-color: #d9822b; }
+      .measure-label[data-kind="tape"] { border-color: #c0392b; font-weight: 600; }
+      .measure-label[hidden] { display: none; }
+      #opening-tools { position: fixed; top: 172px; left: 12px; z-index: 1; display: flex; flex-wrap: wrap; gap: 8px; max-width: 260px; }
+      #opening-tools[hidden], #opening-tools [hidden] { display: none; }
+      #opening-tools button { font: inherit; padding: 4px 10px; }
+      #opening-tools button[aria-pressed="true"] { background: #2f80ed; color: #fff; border-color: #2f80ed; }
+      #opening-hint { flex-basis: 100%; margin: 0; padding: 6px 8px; background: rgba(255, 255, 255, 0.92); border: 1px solid #ccc; border-radius: 4px; }
+      #opening-panel { position: fixed; top: 52px; right: 12px; z-index: 1; display: grid; gap: 6px; width: 260px; max-width: calc(100vw - 24px); box-sizing: border-box; padding: 10px 12px; background: rgba(255, 255, 255, 0.92); border: 1px solid #ccc; border-radius: 6px; }
+      #opening-panel[hidden], #opening-panel [hidden] { display: none; }
+      #opening-panel h2 { margin: 0; font-size: 1rem; }
+      #opening-panel label { white-space: nowrap; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+      #opening-panel input { font: inherit; width: 90px; padding: 2px 4px; box-sizing: border-box; }
+      #opening-panel input[aria-invalid="true"] { border-color: #c0392b; }
+      #opening-panel-message { margin: 0; padding: 6px 8px; background: #fff3cd; border: 1px solid #e0c36c; border-radius: 4px; }
+      #opening-panel .buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+      #opening-panel button { font: inherit; padding: 4px 10px; }
+      #room-panel { position: fixed; top: 52px; right: 12px; z-index: 1; display: grid; gap: 6px; width: 220px; max-width: calc(100% - 48px); padding: 10px 12px; background: rgba(255, 255, 255, 0.92); border: 1px solid #ccc; border-radius: 6px; }
+      #room-panel[hidden], #room-panel [hidden] { display: none; }
+      #room-panel h2 { margin: 0; font-size: 1rem; }
+      #room-panel label, #room-panel .area { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 0; }
+      #room-panel input { font: inherit; width: 110px; padding: 2px 4px; box-sizing: border-box; }
+      #room-panel input[aria-invalid="true"] { border-color: #c0392b; }
+      #room-panel button { font: inherit; padding: 4px 10px; }
+      #room-panel-message, #room-panel-confirm { margin: 0; padding: 6px 8px; background: #fff3cd; border: 1px solid #e0c36c; border-radius: 4px; }
+      #room-panel-confirm p { margin: 0 0 6px; }
+      #room-panel .buttons { display: flex; gap: 8px; }
     </style>
   </head>
   <body>
