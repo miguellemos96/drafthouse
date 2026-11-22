@@ -18,7 +18,7 @@
     "e2e:scratch": "playwright test --project=scratch"
   },
   "engines": {
-    "node": ">=24"
+    "node": ">=24 <25"
   },
   "dependencies": {
     "node-html-parser": "9.0.5",

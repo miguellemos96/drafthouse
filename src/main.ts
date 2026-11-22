@@ -1,5 +1,6 @@
 // Entry point: the saved home (or the sample home) in 3D, with orbit controls, a top view,
-// autosave, undo and redo, Export and Import, items you select, move (free or snapped), rotate and edit, and products added from a link.
+// autosave, undo and redo, Export and Import, items you select, move (free or snapped), rotate and edit, products added from a link,
+// and rooms you select to rename, change the height of or delete.
 // Rooms, items and panels are added issue by issue (see docs/spec.md).
 import * as THREE from 'three'
 import { loadLanguage } from './i18n/index.ts'
@@ -18,6 +19,7 @@ import { mountItemControls, type ItemControls } from './ui/item-controls.ts'
 import { mountItemPanel } from './ui/item-panel.ts'
 import { mountSnapToggle } from './ui/snap-toggle.ts'
 import { applyLanguage, mountLanguageSwitcher } from './ui/language-switcher.ts'
+import { mountRoomPanel } from './ui/room-panel.ts'
 import { mountUndoRedo } from './ui/undo-redo.ts'
 import { mountViewToggle } from './ui/view-toggle.ts'
 
@@ -34,6 +36,8 @@ declare global {
       rig: CameraRig
       /** The id of the selected item, or `null`. */
       selectedItemId: () => string | null
+      /** The id of the selected room, or `null`. */
+      selectedRoomId: () => string | null
       /** Where a point in the home shows on the page, in client pixels. */
       toScreen: (x: number, y: number, z: number) => { x: number; y: number }
     }
@@ -69,6 +73,10 @@ store.subscribe((next) => {
   })
   home = buildHome(next.plan, currentVersion(next).items)
   scene.add(home.group)
+  // Make the new home match the screen now, not at the next frame: a click before that frame
+  // would otherwise hit solid, unfaded walls, or items whose world positions aren't computed yet.
+  home.applyFade(rig.isTopView() ? null : camera.position)
+  home.group.updateMatrixWorld(true)
   itemControls.refresh()
 })
 
@@ -80,6 +88,7 @@ const itemPanel = mountItemPanel(document.body, store, {
   remove: () => itemControls.deleteSelected(),
 })
 const snapToggle = mountSnapToggle(document.body)
+const roomPanel = mountRoomPanel(document.body, store)
 const itemControls: ItemControls = mountItemControls({
   surface: container,
   canvas: renderer.domElement,
@@ -91,12 +100,14 @@ const itemControls: ItemControls = mountItemControls({
   snap: snapToggle.isOn,
   guides: createSnapGuides(scene),
   onSelect: itemPanel.show,
+  onSelectRoom: roomPanel.show,
 })
 
 window.drafthouse = {
   store,
   rig,
   selectedItemId: itemControls.selectedId,
+  selectedRoomId: itemControls.selectedRoomId,
   toScreen: (x, y, z) => {
     const ndc = new THREE.Vector3(x, y, z).project(camera)
     const rect = renderer.domElement.getBoundingClientRect()
@@ -118,6 +129,7 @@ mountLanguageSwitcher(document.body, () => {
   addItem.render()
   itemPanel.render()
   snapToggle.render()
+  roomPanel.render()
 })
 
 const resize = () => {
