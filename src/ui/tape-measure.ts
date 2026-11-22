@@ -68,7 +68,7 @@ export const mountTapeMeasure = ({ parent, surface, canvas, camera, view, measur
     const rect = canvas.getBoundingClientRect()
     const ndc = new THREE.Vector2(((event.clientX - rect.left) / rect.width) * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1)
     raycaster.setFromCamera(ndc, camera)
-    const [hit] = raycaster.intersectObjects(view().items, true)
+    const [hit] = raycaster.intersectObjects(view().items.filter((group) => group.visible), true)
     const point = hit?.point ?? raycaster.ray.intersectPlane(FLOOR, new THREE.Vector3())
     return point ? { x: point.x, y: point.y, z: point.z } : null
   }

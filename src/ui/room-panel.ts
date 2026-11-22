@@ -1,4 +1,4 @@
-// The panel for the selected room: its name, wall height and area, and a Delete room button that
+// The panel for the selected room: its name, wall height and area, a Focus button, and a Delete room button that
 // asks first, in the app, how many items go with it. Each finished edit is one change through the
 // store. The rules are in src/model/room.ts. See "Rooms" in docs/spec.md.
 import { getLanguage, t } from '../i18n/index.ts'
@@ -9,7 +9,7 @@ import type { Store } from '../model/store.ts'
 
 export type RoomPanel = { show: (room: Room | null) => void; render: () => void }
 
-export function mountRoomPanel(parent: HTMLElement, store: Store): RoomPanel {
+export function mountRoomPanel(parent: HTMLElement, store: Store, focus: (room: Room) => void = () => {}): RoomPanel {
   const panel = document.createElement('aside')
   panel.id = 'room-panel'
   panel.hidden = true
@@ -44,6 +44,13 @@ export function mountRoomPanel(parent: HTMLElement, store: Store): RoomPanel {
   message.setAttribute('role', 'alert')
   message.hidden = true
 
+  const focusButton = document.createElement('button')
+  focusButton.type = 'button'
+  focusButton.id = 'room-panel-focus'
+  focusButton.addEventListener('click', () => {
+    if (room) focus(room)
+  })
+
   const remove = document.createElement('button')
   remove.type = 'button'
   remove.id = 'room-panel-delete'
@@ -72,6 +79,8 @@ export function mountRoomPanel(parent: HTMLElement, store: Store): RoomPanel {
     name.text.textContent = t('room.panel.name')
     height.text.textContent = t('room.panel.height')
     areaLabel.textContent = t('room.panel.area')
+    focusButton.textContent = t('room.panel.focus')
+    focusButton.title = t('room.panel.focus.title')
     remove.textContent = t('room.panel.delete')
     yes.textContent = t('room.panel.confirm.yes')
     no.textContent = t('room.panel.confirm.no')
@@ -139,7 +148,10 @@ export function mountRoomPanel(parent: HTMLElement, store: Store): RoomPanel {
   })
 
   render()
-  panel.append(title, name.label, height.label, message, area, remove, confirm)
+  const buttons = document.createElement('div')
+  buttons.className = 'buttons'
+  buttons.append(focusButton, remove)
+  panel.append(title, name.label, height.label, message, area, buttons, confirm)
   parent.appendChild(panel)
   return { show, render }
 }

@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 import * as THREE from 'three'
 import { addOpening, newOpening } from '../model/openings.ts'
 import { wallsOf, type Plan } from '../model/plan.ts'
-import { sampleHome } from '../model/sample.ts'
+import { currentVersion } from '../model/home.ts'
+import { newSampleHome, sampleHome } from '../model/sample.ts'
 import { buildHome, WALL_THICKNESS } from './home.ts'
 
 const box = (object: THREE.Object3D) => new THREE.Box3().setFromObject(object)
@@ -106,5 +107,41 @@ describe('buildHome', () => {
       expect(b.max.x - b.min.x).toBeCloseTo(80) // a quarter circle as wide as the door
       expect(b.max.z - b.min.z).toBeCloseTo(80)
     })
+  })
+})
+
+describe('hiding rooms', () => {
+  // Room 1 ("living") holds the sofa and the table; the bed is in Room 2. A window on Room 1's front
+  // wall and a door on the shared wall.
+  const withOpenings = (): Plan => {
+    let plan = sampleHome()
+    const walls = wallsOf(plan)
+    const shared = walls.find((w) => w.rooms.length === 2)!
+    const front = walls.find((w) => w.rooms[0] === 'living' && w.a.y === 0 && w.b.y === 0)!
+    plan = addOpening(plan, newOpening(plan, 'door', shared, 150, 'door')!)!
+    return addOpening(plan, newOpening(plan, 'window', front, 200, 'window')!)!
+  }
+
+  it('hides the floor, the walls only it borders with their windows, and its items; the shared wall and its door stay', () => {
+    const home = buildHome(withOpenings(), currentVersion(newSampleHome()).items)
+    home.showArcs(true)
+    home.applyHidden(new Set(['living']))
+    expect(home.floors.map((f) => f.visible)).toEqual([false, true])
+    expect(home.items.filter((g) => g.visible).map((g) => g.name)).toEqual(['sample-bed'])
+    for (const { wall, mesh } of home.walls) expect(mesh.visible).toBe(wall.rooms.includes('bedroom'))
+    expect(home.panes.find((p) => p.opening === 'window')!.mesh.visible).toBe(false)
+    expect(home.arcs.find((a) => a.opening === 'door')!.object.visible).toBe(true)
+  })
+
+  it('hides the shared wall and its door when both rooms are hidden, and shows everything again', () => {
+    const home = buildHome(withOpenings(), currentVersion(newSampleHome()).items)
+    home.showArcs(true)
+    home.applyHidden(new Set(['living', 'bedroom']))
+    expect(home.walls.some(({ mesh }) => mesh.visible)).toBe(false)
+    expect(home.arcs.find((a) => a.opening === 'door')!.object.visible).toBe(false)
+    home.applyHidden(new Set())
+    expect(home.walls.every(({ mesh }) => mesh.visible)).toBe(true)
+    expect(home.items.every((g) => g.visible)).toBe(true)
+    expect(home.arcs.find((a) => a.opening === 'door')!.object.visible).toBe(true)
   })
 })
