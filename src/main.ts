@@ -1,5 +1,5 @@
 // Entry point: the saved home (or the sample home) in 3D, with orbit controls, a top view,
-// autosave, undo and redo, Export and Import, items you select, move, rotate and edit, products added from a link,
+// autosave, undo and redo, Export and Import, items you select, move (free or snapped), rotate and edit, products added from a link,
 // and rooms you select to rename, change the height of or delete.
 // Rooms, items and panels are added issue by issue (see docs/spec.md).
 import * as THREE from 'three'
@@ -11,11 +11,13 @@ import { createStore, type Store } from './model/store.ts'
 import { createCameraRig, type CameraRig } from './scene/camera.ts'
 import { buildHome, type HomeView } from './scene/home.ts'
 import { createSelectionView } from './scene/selection.ts'
+import { createSnapGuides } from './scene/snap-guides.ts'
 import { mountAddItem } from './ui/add-item.ts'
 import { mountAddRoom } from './ui/add-room.ts'
 import { mountFileButtons } from './ui/file-buttons.ts'
 import { mountItemControls, type ItemControls } from './ui/item-controls.ts'
 import { mountItemPanel } from './ui/item-panel.ts'
+import { mountSnapToggle } from './ui/snap-toggle.ts'
 import { applyLanguage, mountLanguageSwitcher } from './ui/language-switcher.ts'
 import { mountRoomPanel } from './ui/room-panel.ts'
 import { mountUndoRedo } from './ui/undo-redo.ts'
@@ -71,6 +73,10 @@ store.subscribe((next) => {
   })
   home = buildHome(next.plan, currentVersion(next).items)
   scene.add(home.group)
+  // Make the new home match the screen now, not at the next frame: a click before that frame
+  // would otherwise hit solid, unfaded walls, or items whose world positions aren't computed yet.
+  home.applyFade(rig.isTopView() ? null : camera.position)
+  home.group.updateMatrixWorld(true)
   itemControls.refresh()
 })
 
@@ -81,6 +87,7 @@ const itemPanel = mountItemPanel(document.body, store, {
   duplicate: () => itemControls.duplicateSelected(),
   remove: () => itemControls.deleteSelected(),
 })
+const snapToggle = mountSnapToggle(document.body)
 const roomPanel = mountRoomPanel(document.body, store)
 const itemControls: ItemControls = mountItemControls({
   surface: container,
@@ -90,6 +97,8 @@ const itemControls: ItemControls = mountItemControls({
   store,
   view: () => home,
   selection: createSelectionView(scene),
+  snap: snapToggle.isOn,
+  guides: createSnapGuides(scene),
   onSelect: itemPanel.show,
   onSelectRoom: roomPanel.show,
 })
@@ -119,6 +128,7 @@ mountLanguageSwitcher(document.body, () => {
   undoRedo.render()
   addItem.render()
   itemPanel.render()
+  snapToggle.render()
   roomPanel.render()
 })
 

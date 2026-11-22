@@ -8,9 +8,11 @@ import { addItem, currentVersion, removeItem, updateItem } from '../model/home.t
 import type { FloorPoint, Item } from '../model/item.ts'
 import { dragPosition, pointerAngle, rotateByHandle, stepRotation } from '../model/move.ts'
 import { itemPlacement } from '../model/placement.ts'
-import type { Room } from '../model/plan.ts'
+import { wallsOf, type Room } from '../model/plan.ts'
+import { snapPosition, snapRotation, snapStepRotation, type Guide } from '../model/snap.ts'
 import type { Store } from '../model/store.ts'
 import type { HomeView } from '../scene/home.ts'
+import type { SnapGuidesView } from '../scene/snap-guides.ts'
 import { tintFloor, tintItem, type SelectionView } from '../scene/selection.ts'
 import { isMacPlatform, isTypingTarget, itemShortcut } from './shortcuts.ts'
 
@@ -31,6 +33,10 @@ export type ItemControlsOptions = {
   store: Store
   view: () => HomeView
   selection: SelectionView
+  /** Whether the Snap toggle is on. Holding Alt during a drag turns it off for that drag. */
+  snap?: () => boolean
+  /** Shows what a dragged item snapped to. */
+  guides?: SnapGuidesView
   /** Called with the selected item (or null) whenever the selection or the home changes. */
   onSelect?: (item: Item | null) => void
   /** Called with the selected room (or null) whenever the selection or the home changes. */
@@ -57,7 +63,7 @@ const FLOOR = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)
 const isTyping = (target: EventTarget | null) =>
   target instanceof HTMLElement && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
 
-export const mountItemControls = ({ surface, canvas, camera, controls, store, view, selection, onSelect, onSelectRoom, mac = isMacPlatform(navigator.platform) }: ItemControlsOptions): ItemControls => {
+export const mountItemControls = ({ surface, canvas, camera, controls, store, view, selection, snap = () => false, guides, onSelect, onSelectRoom, mac = isMacPlatform(navigator.platform) }: ItemControlsOptions): ItemControls => {
   let selected: string | null = null
   let selectedRoom: string | null = null
   let gesture: Gesture | null = null
@@ -161,11 +167,22 @@ export const mountItemControls = ({ surface, canvas, camera, controls, store, vi
     const point = floorPoint()
     if (!point) return
     const { item } = gesture
+    const snapping = snap() && !event.altKey
+    let shown: Guide[] = []
     if (gesture.kind === 'move') {
-      gesture.preview = { ...item, position: dragPosition(item.position, gesture.pointerStart, point) }
+      const raw = dragPosition(item.position, gesture.pointerStart, point)
+      if (snapping) {
+        const snapped = snapPosition(item, raw, items(), wallsOf(store.get().plan))
+        gesture.preview = { ...item, position: snapped.position }
+        shown = [snapped.x, snapped.z].flatMap((target) => (target.kind === 'grid' ? [] : [target.guide]))
+      } else {
+        gesture.preview = { ...item, position: raw }
+      }
     } else {
-      gesture.preview = { ...item, rotation: rotateByHandle(item.rotation, gesture.pointerStartAngle, pointerAngle(item.position, point)) }
+      const angle = rotateByHandle(item.rotation, gesture.pointerStartAngle, pointerAngle(item.position, point))
+      gesture.preview = { ...item, rotation: snapping ? snapRotation(angle) : angle }
     }
+    guides?.show(shown)
     preview(gesture.preview)
   }
 
@@ -174,6 +191,7 @@ export const mountItemControls = ({ surface, canvas, camera, controls, store, vi
     const ended = gesture
     gesture = null
     controls.enabled = true
+    guides?.show([])
     if (ended.kind === 'press') {
       // A click on a room's floor selects the room; anywhere else clears the selection.
       if (Math.hypot(event.clientX - ended.x, event.clientY - ended.y) < CLICK_SLOP) {
@@ -193,6 +211,7 @@ export const mountItemControls = ({ surface, canvas, camera, controls, store, vi
     const ended = gesture
     gesture = null
     controls.enabled = true
+    guides?.show([])
     if (ended.kind !== 'press') preview(ended.item)
   }
 
@@ -231,7 +250,7 @@ export const mountItemControls = ({ surface, canvas, camera, controls, store, vi
     const item = findItem(selected)
     if (!steps || !item || gesture) return
     event.preventDefault()
-    store.set(updateItem(store.get(), item.id, { rotation: stepRotation(item.rotation, steps) }))
+    store.set(updateItem(store.get(), item.id, { rotation: snap() ? snapStepRotation(item.rotation, steps) : stepRotation(item.rotation, steps) }))
   }
 
   // Capture on the surface: these run before the orbit controls' own listeners on the canvas.
