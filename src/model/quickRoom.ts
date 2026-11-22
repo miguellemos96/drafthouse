@@ -41,5 +41,6 @@ export const placeQuickRoom = (plan: Plan, { id, name, width, length, height }: 
 
 /** The plan with the quick room added. Returns a new plan. */
 export const addQuickRoom = (plan: Plan, room: QuickRoomSize & { id?: string; name: string }): Plan => ({
+  ...plan,
   rooms: [...plan.rooms, placeQuickRoom(plan, room)],
 })

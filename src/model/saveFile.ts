@@ -1,5 +1,6 @@
 // The save file: a Home as JSON text, with a `formatVersion` so older files can be migrated.
-// See "Saving" in docs/spec.md.
+// See "Saving" in docs/spec.md. Doors and windows (`plan.openings`) came without a format bump: a file
+// without them is a home with no openings, so there is nothing to migrate.
 import { FORMAT_VERSION, type Home } from './home.ts'
 import type { Mount } from './item.ts'
 import { createRoom } from './plan.ts'
@@ -75,6 +76,15 @@ const isRoom = (room: unknown) => {
   }
 }
 
+const isPoint = (p: unknown) => hasNumbers(p, ['x', 'y'])
+
+const isOpening = (opening: unknown) => {
+  if (!isObject(opening) || !isString(opening.id) || !isObject(opening.wall) || !isPoint(opening.wall.a) || !isPoint(opening.wall.b)) return false
+  if (!['offset', 'width', 'height', 'sillHeight'].every((k) => isNumber(opening[k]))) return false
+  if (opening.kind === 'window') return true
+  return opening.kind === 'door' && ['start', 'end'].includes(opening.hinge as string) && ['in', 'out'].includes(opening.swing as string) && isString(opening.room)
+}
+
 const isProduct = (product: unknown) =>
   isObject(product) &&
   optional(product.url, isString) &&
@@ -101,6 +111,7 @@ const isVersion = (version: unknown) =>
 function isHome(data: Data): data is Home {
   if (data.formatVersion !== FORMAT_VERSION || !optional(data.name, isString)) return false
   if (!isObject(data.plan) || !Array.isArray(data.plan.rooms) || !data.plan.rooms.every(isRoom)) return false
+  if (data.plan.openings !== undefined && !(Array.isArray(data.plan.openings) && data.plan.openings.every(isOpening))) return false
   const { versions } = data
   if (!Array.isArray(versions) || versions.length === 0 || !versions.every(isVersion)) return false
   const ids = versions.map((v: Data) => v.id)
