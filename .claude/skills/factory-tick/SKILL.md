@@ -20,6 +20,7 @@ You run unattended. Do exactly one step, then stop.
 2. Run `node scripts/factory/next-step.mjs` and read the one JSON line it prints.
 3. Act on `step`:
    - `idle`: print `TICK-RESULT: idle <reason>` and stop. Do nothing else.
+   - `conflicts`: run the `worker` skill with `<issue> conflicts <pr>`. The PR conflicts with main; the worker merges main in.
    - `verify`: run the `verifier` skill with the given `pr`.
    - `fix`: run the `worker` skill with `<issue> fix <pr>`.
    - `work`: run the `worker` skill with the given `issue`.

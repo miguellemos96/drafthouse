@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { blockersOf, inWindow, orderQueue, pickStep, verdictOf, withOpenBlockers } from './next-step.mjs'
+import { blockersOf, CONFLICTS_PARKED, inWindow, MERGED_MAIN, needsConflictFix, orderQueue, pickStep, verdictOf, withOpenBlockers } from './next-step.mjs'
 
-const config = { start: '21:00', cutoff: '03:00', maxFixRounds: 2, maxInconclusive: 2, branchPrefix: 'factory/' }
+const config = { start: '21:00', cutoff: '03:00', maxFixRounds: 2, maxInconclusive: 2, maxConflictRounds: 5, branchPrefix: 'factory/' }
 const night = new Date('2026-11-06T23:00:00')
 const labels = (...names) => names.map((name) => ({ name }))
 const issue = (number, names, createdAt = '2026-01-01', assignees = []) => ({ number, labels: labels(...names), assignees, createdAt })
@@ -99,4 +99,31 @@ test('an issue waits while a blocker is open, and joins the queue once all are c
   assert.deepEqual(queueWith([8, 9]).map((i) => i.number), [12])
   assert.deepEqual(queueWith([8]).map((i) => i.number), [11, 12])
   assert.deepEqual(queueWith([]).map((i) => i.number), [10, 11, 12])
+})
+
+test('a conflicting factory PR is fixed first, oldest PR first, before any verify', () => {
+  const unverified = pr({ url: 'https://example/pr/9', number: 9 })
+  const newer = pr({ url: 'https://example/pr/8', number: 8, mergeable: 'CONFLICTING', closingIssuesReferences: [{ number: 46 }] })
+  const older = pr({ url: 'https://example/pr/7', number: 7, mergeable: 'CONFLICTING', closingIssuesReferences: [{ number: 45 }] })
+  assert.deepEqual(pick({ prs: [unverified, newer, older] }), { step: 'conflicts', pr: 'https://example/pr/7', issue: 45 })
+})
+
+test('a conflicting PR is never sent to the verifier or a fix round', () => {
+  const conflicting = pr({ mergeable: 'CONFLICTING', comments: [{ body: `${CONFLICTS_PARKED}\nBoth change the same rule.` }] })
+  assert.deepEqual(pick({ prs: [conflicting] }), { step: 'idle', reason: 'queue empty' })
+  const failed = pr({ mergeable: 'CONFLICTING', statusCheckRollup: [{ context: 'verifier', state: 'FAILURE' }], comments: [{ body: `${CONFLICTS_PARKED}` }] })
+  assert.equal(pick({ prs: [failed] }).step, 'idle')
+})
+
+test('needsConflictFix: only CONFLICTING, not after a park, and at most maxConflictRounds times', () => {
+  const merged = { body: `${MERGED_MAIN}\nKept both.` }
+  const parked = { body: `${CONFLICTS_PARKED}\nNeeds a decision.` }
+  assert.equal(needsConflictFix(pr({ mergeable: 'MERGEABLE' }), 5), false)
+  assert.equal(needsConflictFix(pr({ mergeable: 'UNKNOWN' }), 5), false)
+  assert.equal(needsConflictFix(pr({ mergeable: 'CONFLICTING' }), 5), true)
+  assert.equal(needsConflictFix(pr({ mergeable: 'CONFLICTING', comments: [merged, merged] }), 5), true)
+  assert.equal(needsConflictFix(pr({ mergeable: 'CONFLICTING', comments: Array(5).fill(merged) }), 5), false)
+  assert.equal(needsConflictFix(pr({ mergeable: 'CONFLICTING', comments: [merged, parked] }), 5), false)
+  // The human deleted the park comment, or a later round resolved it: the factory may try again.
+  assert.equal(needsConflictFix(pr({ mergeable: 'CONFLICTING', comments: [parked, merged] }), 5), true)
 })
