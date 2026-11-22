@@ -9,9 +9,12 @@ import { addItem, currentVersion, removeItem, updateItem } from '../model/home.t
 import type { FloorPoint, Item } from '../model/item.ts'
 import { dragPosition, pointerAngle, rotateByHandle, stepRotation } from '../model/move.ts'
 import { itemPlacement } from '../model/placement.ts'
+import { wallsOf, type Room } from '../model/plan.ts'
+import { snapPosition, snapRotation, snapStepRotation, type Guide } from '../model/snap.ts'
 import type { Store } from '../model/store.ts'
 import type { HomeView } from '../scene/home.ts'
-import { tintItem, type SelectionView } from '../scene/selection.ts'
+import type { SnapGuidesView } from '../scene/snap-guides.ts'
+import { tintFloor, tintItem, type SelectionView } from '../scene/selection.ts'
 import { isMacPlatform, isTypingTarget, itemShortcut } from './shortcuts.ts'
 
 /** A press that moves less than this many pixels before release is a click. */
@@ -31,8 +34,14 @@ export type ItemControlsOptions = {
   store: Store
   view: () => HomeView
   selection: SelectionView
+  /** Whether the Snap toggle is on. Holding Alt during a drag turns it off for that drag. */
+  snap?: () => boolean
+  /** Shows what a dragged item snapped to. */
+  guides?: SnapGuidesView
   /** Called with the selected item (or null) whenever the selection or the home changes. */
   onSelect?: (item: Item | null) => void
+  /** Called with the selected room (or null) whenever the selection or the home changes. */
+  onSelectRoom?: (room: Room | null) => void
   /** Called with the item where it is now on each step of a drag, and with null when the drag ends. */
   onDrag?: (item: Item | null) => void
   /** While this returns true, the pointer neither selects nor moves items (another tool has it). */
@@ -42,12 +51,18 @@ export type ItemControlsOptions = {
 
 export type ItemControls = {
   selectedId: () => string | null
+  /** The id of the selected room, or `null`. An item and a room are never selected together. */
+  selectedRoomId: () => string | null
+  /** Clears the selection, item or room. */
+  clear: () => void
   /** Call after the home view is rebuilt, so the highlight lands on the new meshes. */
   refresh: () => void
   /** Copies the selected item 20 cm to the right and towards the camera, and selects the copy. */
   duplicateSelected: () => void
   /** Removes the selected item and clears the selection. */
   deleteSelected: () => void
+  /** Clears the selection. */
+  deselect: () => void
 }
 
 const FLOOR = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)
@@ -63,12 +78,16 @@ export const mountItemControls = ({
   store,
   view,
   selection,
+  snap = () => false,
+  guides,
   onSelect,
+  onSelectRoom,
   onDrag,
   paused = () => false,
   mac = isMacPlatform(navigator.platform),
 }: ItemControlsOptions): ItemControls => {
   let selected: string | null = null
+  let selectedRoom: string | null = null
   let gesture: Gesture | null = null
   const raycaster = new THREE.Raycaster()
 
@@ -98,15 +117,36 @@ export const mountItemControls = ({
     return null
   }
 
-  const show = (item: Item | null) => {
-    for (const group of view().items) tintItem(group, group.name === item?.id)
-    selection.show(item)
-    onSelect?.(item)
+  /** The room whose floor is under the pointer, unless a solid wall stands in front of it. */
+  const pickRoom = (): string | null => {
+    const home = view()
+    const solidWalls = home.walls.filter(({ mesh }) => mesh.material.opacity === 1).map(({ mesh }) => mesh)
+    const [hit] = raycaster.intersectObjects([...home.floors, ...solidWalls], false)
+    return hit && home.floors.includes(hit.object as THREE.Mesh) ? hit.object.name : null
   }
 
+  const findRoom = (id: string | null) => store.get().plan.rooms.find((room) => room.id === id) ?? null
+
+  const show = (item: Item | null) => {
+    for (const group of view().items) tintItem(group, group.name === item?.id)
+    for (const floor of view().floors) tintFloor(floor, floor.name === selectedRoom)
+    selection.show(item)
+    onSelect?.(item)
+    onSelectRoom?.(findRoom(selectedRoom))
+  }
+
+  /** Selects an item, which clears any selected room. */
   const select = (id: string | null) => {
     selected = id
+    selectedRoom = null
     show(findItem(id))
+  }
+
+  /** Selects a room, which clears any selected item. */
+  const selectRoom = (id: string | null) => {
+    selected = null
+    selectedRoom = id
+    show(null)
   }
 
   /** Shows an item where it would be after the gesture, without touching the store. */
@@ -149,12 +189,23 @@ export const mountItemControls = ({
     const point = floorPoint()
     if (!point) return
     const { item } = gesture
+    const snapping = snap() && !event.altKey
+    let shown: Guide[] = []
     if (gesture.kind === 'move') {
-      gesture.preview = { ...item, position: dragPosition(item.position, gesture.pointerStart, point) }
+      const raw = dragPosition(item.position, gesture.pointerStart, point)
+      if (snapping) {
+        const snapped = snapPosition(item, raw, items(), wallsOf(store.get().plan))
+        gesture.preview = { ...item, position: snapped.position }
+        shown = [snapped.x, snapped.z].flatMap((target) => (target.kind === 'grid' ? [] : [target.guide]))
+      } else {
+        gesture.preview = { ...item, position: raw }
+      }
       onDrag?.(gesture.preview)
     } else {
-      gesture.preview = { ...item, rotation: rotateByHandle(item.rotation, gesture.pointerStartAngle, pointerAngle(item.position, point)) }
+      const angle = rotateByHandle(item.rotation, gesture.pointerStartAngle, pointerAngle(item.position, point))
+      gesture.preview = { ...item, rotation: snapping ? snapRotation(angle) : angle }
     }
+    guides?.show(shown)
     preview(gesture.preview)
   }
 
@@ -163,9 +214,14 @@ export const mountItemControls = ({
     const ended = gesture
     gesture = null
     controls.enabled = true
+    guides?.show([])
     if (ended.kind === 'move') onDrag?.(null)
     if (ended.kind === 'press') {
-      if (Math.hypot(event.clientX - ended.x, event.clientY - ended.y) < CLICK_SLOP) select(null)
+      // A click on a room's floor selects the room; anywhere else clears the selection.
+      if (Math.hypot(event.clientX - ended.x, event.clientY - ended.y) < CLICK_SLOP) {
+        aim(event)
+        selectRoom(pickRoom())
+      }
       return
     }
     const { item, preview: moved } = ended
@@ -179,6 +235,7 @@ export const mountItemControls = ({
     const ended = gesture
     gesture = null
     controls.enabled = true
+    guides?.show([])
     if (ended.kind === 'move') onDrag?.(null)
     if (ended.kind !== 'press') preview(ended.item)
   }
@@ -218,7 +275,7 @@ export const mountItemControls = ({
     const item = findItem(selected)
     if (!steps || !item || gesture) return
     event.preventDefault()
-    store.set(updateItem(store.get(), item.id, { rotation: stepRotation(item.rotation, steps) }))
+    store.set(updateItem(store.get(), item.id, { rotation: snap() ? snapStepRotation(item.rotation, steps) : stepRotation(item.rotation, steps) }))
   }
 
   // Capture on the surface: these run before the orbit controls' own listeners on the canvas.
@@ -231,8 +288,14 @@ export const mountItemControls = ({
   const refresh = () => {
     // A home that no longer has the selected item (an import, say) clears the selection.
     if (selected !== null && !findItem(selected)) selected = null
+    if (selectedRoom !== null && !findRoom(selectedRoom)) selectedRoom = null
     show(findItem(selected))
   }
 
-  return { selectedId: () => selected, refresh, duplicateSelected, deleteSelected }
+  /** Clears the item or room selection, if there is one. Used when a door or window is selected. */
+  const deselect = () => {
+    if (selected !== null || selectedRoom !== null) select(null)
+  }
+
+  return { selectedId: () => selected, selectedRoomId: () => selectedRoom, clear: () => select(null), refresh, duplicateSelected, deleteSelected, deselect }
 }

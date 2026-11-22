@@ -1,14 +1,17 @@
-// The HTTP server: the built site from `dist/` and `POST /api/read-link`.
+// The HTTP server: the built site from `dist/`, `POST /api/read-link` and `GET /healthz`.
 
 import { createReadStream } from 'node:fs'
 import { stat } from 'node:fs/promises'
 import http, { type IncomingMessage, type ServerResponse } from 'node:http'
 import path from 'node:path'
+import { clientIp } from './clientIp.ts'
 import { readLink, type ReadLinkDeps } from './readLink.ts'
 
 export interface AppOptions {
   distDir: string
   readLink: ReadLinkDeps
+  /** The header with the visitor IP, set by a trusted proxy (`CLIENT_IP_HEADER`). */
+  clientIpHeader?: string
 }
 
 const MAX_REQUEST_BYTES = 16 * 1024
@@ -97,13 +100,18 @@ export const createApp = (options: AppOptions) =>
   http.createServer((req, res) => {
     const handle = async () => {
       const pathname = (req.url ?? '/').split('?')[0]
+      if (pathname === '/healthz') {
+        res.writeHead(200, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' }).end('ok')
+        return
+      }
       if (pathname === '/api/read-link') {
         if (req.method !== 'POST') {
           res.writeHead(405, { allow: 'POST' }).end()
           return
         }
         const body = await readJson(req)
-        const result = await readLink(body, req.socket.remoteAddress ?? 'unknown', options.readLink)
+        const ip = clientIp(req.headers, req.socket.remoteAddress, options.clientIpHeader)
+        const result = await readLink(body, ip, options.readLink)
         sendJson(res, result.status, result.json)
         return
       }
