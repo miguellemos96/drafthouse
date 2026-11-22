@@ -1,4 +1,4 @@
-// Draws measurements: the lines shown while an item is dragged and the tape measure's line.
+// Draws measurements: the lines shown while an item is dragged, the tape measure's line, and the edges of a room being drawn.
 // Each line gets a label with its length, an HTML element kept over the line's middle.
 // The distances themselves come from src/model/distances.ts.
 import * as THREE from 'three'
@@ -9,17 +9,20 @@ import type { Point3 } from '../model/placement.ts'
 const DRAG_COLOUR = 0x2f80ed
 const ITEM_COLOUR = 0xd9822b
 const TAPE_COLOUR = 0xc0392b
+const SKETCH_COLOUR = 0x2f80ed
 const LIFT = 2 // cm above the floor, so floor lines don't flicker against it
 const POINT_RADIUS = 4 // cm
 
 /** One line to draw: its ends in the home, its length, and what it measures (for the label's `data-kind`). */
-export type MeasureLine = { from: Point3; to: Point3; distance: number; kind: Side | 'item' | 'tape' }
+export type MeasureLine = { from: Point3; to: Point3; distance: number; kind: Side | 'item' | 'tape' | 'sketch' }
 
 export type MeasureView = {
   /** Shows the lines while an item is dragged; an empty list hides them. */
   showDrag: (lines: MeasureLine[]) => void
   /** Shows the tape: its start point alone, or both points and the line between them; `null` hides it. */
   showTape: (start: Point3 | null, end: Point3 | null, distance: number | null) => void
+  /** Shows the outline of a room being drawn, each edge with its length; an empty list hides it. */
+  showSketch: (lines: MeasureLine[]) => void
   /** Keeps the labels over their lines. Call once per frame, after the camera moves. */
   update: () => void
 }
@@ -46,13 +49,14 @@ export const createMeasureView = (scene: THREE.Scene, overlay: HTMLElement, came
   const group = new THREE.Group()
   scene.add(group)
   const material = (colour: number) => new THREE.LineBasicMaterial({ color: colour, depthTest: false })
-  const materials = { drag: material(DRAG_COLOUR), item: material(ITEM_COLOUR), tape: material(TAPE_COLOUR) }
+  const materials = { drag: material(DRAG_COLOUR), item: material(ITEM_COLOUR), tape: material(TAPE_COLOUR), sketch: material(SKETCH_COLOUR) }
   const pointMaterial = new THREE.MeshBasicMaterial({ color: TAPE_COLOUR, depthTest: false })
   const pointGeometry = new THREE.SphereGeometry(POINT_RADIUS, 12, 8)
 
   type Drawn = { objects: THREE.Object3D[]; labels: { element: HTMLElement; at: THREE.Vector3 }[] }
   const drag: Drawn = { objects: [], labels: [] }
   const tape: Drawn = { objects: [], labels: [] }
+  const sketch: Drawn = { objects: [], labels: [] }
 
   const clear = (drawn: Drawn) => {
     for (const object of drawn.objects) {
@@ -69,7 +73,7 @@ export const createMeasureView = (scene: THREE.Scene, overlay: HTMLElement, came
   const addLine = (drawn: Drawn, line: MeasureLine) => {
     const from = new THREE.Vector3(line.from.x, line.from.y, line.from.z)
     const to = new THREE.Vector3(line.to.x, line.to.y, line.to.z)
-    const mat = line.kind === 'tape' ? materials.tape : line.kind === 'item' ? materials.item : materials.drag
+    const mat = line.kind === 'tape' || line.kind === 'item' || line.kind === 'sketch' ? materials[line.kind] : materials.drag
     const object = onTop(new THREE.Line(new THREE.BufferGeometry().setFromPoints([from, to]), mat))
     group.add(object)
     drawn.objects.push(object)
@@ -106,7 +110,7 @@ export const createMeasureView = (scene: THREE.Scene, overlay: HTMLElement, came
   const update = () => {
     const width = canvas.clientWidth
     const height = canvas.clientHeight
-    for (const { element, at } of [...drag.labels, ...tape.labels]) {
+    for (const { element, at } of [...drag.labels, ...tape.labels, ...sketch.labels]) {
       projected.copy(at).project(camera)
       const visible = projected.z < 1
       element.hidden = !visible
@@ -116,5 +120,11 @@ export const createMeasureView = (scene: THREE.Scene, overlay: HTMLElement, came
     }
   }
 
-  return { showDrag, showTape, update }
+  const showSketch = (lines: MeasureLine[]) => {
+    clear(sketch)
+    for (const line of lines) addLine(sketch, line)
+    update()
+  }
+
+  return { showDrag, showTape, showSketch, update }
 }
