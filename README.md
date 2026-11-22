@@ -13,6 +13,10 @@ npm run check    # typecheck, lint, tests, build
 - What it does and why: [docs/spec.md](docs/spec.md)
 - Rules for Claude Code sessions: [CLAUDE.md](CLAUDE.md)
 
+## Hosting
+
+DraftHouse runs on Render Free as one web service, described in [render.yaml](render.yaml) (a Render Blueprint). Node is pinned to 24 in [.node-version](.node-version). The server listens on `PORT` and reads the visitor IP from the header named in `CLIENT_IP_HEADER`; it answers `GET /healthz` with `ok`. Creating the service is a human step: see issue #60.
+
 ## The factory
 
 Issues labeled `ready-for-agent` are worked by scheduled Claude Code sessions into PRs. A separate session verifies each PR and posts a `verifier` status. You merge.

@@ -13,6 +13,8 @@
       #file-buttons button { font: inherit; padding: 4px 10px; }
       #history { position: fixed; top: 52px; left: 12px; z-index: 1; display: flex; gap: 8px; }
       #history button { font: inherit; padding: 4px 10px; }
+      #snap-toggle { position: fixed; top: 92px; left: 12px; z-index: 1; font: inherit; padding: 4px 10px; }
+      #snap-toggle[aria-pressed="true"] { background: #2f80ed; color: #fff; border: 1px solid #1d5fbf; border-radius: 3px; }
       #file-message { flex-basis: 100%; margin: 0; padding: 6px 10px; background: #fff3cd; border: 1px solid #e0c36c; border-radius: 4px; text-align: center; }
       #add-room { position: fixed; left: 12px; bottom: 12px; z-index: 1; display: grid; gap: 6px; width: 220px; max-width: calc(100% - 48px); padding: 10px 12px; background: rgba(255, 255, 255, 0.92); border: 1px solid #ccc; border-radius: 6px; }
       #add-room h2 { margin: 0; font-size: 1rem; }
@@ -56,7 +58,7 @@
       #item-panel .buttons { display: flex; gap: 8px; }
       #item-panel button { font: inherit; padding: 4px 10px; }
       #item-panel img { width: 100%; max-height: 140px; object-fit: contain; background: #fff; border-radius: 4px; }
-      #opening-tools { position: fixed; top: 92px; left: 12px; z-index: 1; display: flex; flex-wrap: wrap; gap: 8px; max-width: 260px; }
+      #opening-tools { position: fixed; top: 132px; left: 12px; z-index: 1; display: flex; flex-wrap: wrap; gap: 8px; max-width: 260px; }
       #opening-tools[hidden], #opening-tools [hidden] { display: none; }
       #opening-tools button { font: inherit; padding: 4px 10px; }
       #opening-tools button[aria-pressed="true"] { background: #2f80ed; color: #fff; border-color: #2f80ed; }
@@ -70,6 +72,16 @@
       #opening-panel-message { margin: 0; padding: 6px 8px; background: #fff3cd; border: 1px solid #e0c36c; border-radius: 4px; }
       #opening-panel .buttons { display: flex; flex-wrap: wrap; gap: 8px; }
       #opening-panel button { font: inherit; padding: 4px 10px; }
+      #room-panel { position: fixed; top: 52px; right: 12px; z-index: 1; display: grid; gap: 6px; width: 220px; max-width: calc(100% - 48px); padding: 10px 12px; background: rgba(255, 255, 255, 0.92); border: 1px solid #ccc; border-radius: 6px; }
+      #room-panel[hidden], #room-panel [hidden] { display: none; }
+      #room-panel h2 { margin: 0; font-size: 1rem; }
+      #room-panel label, #room-panel .area { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 0; }
+      #room-panel input { font: inherit; width: 110px; padding: 2px 4px; box-sizing: border-box; }
+      #room-panel input[aria-invalid="true"] { border-color: #c0392b; }
+      #room-panel button { font: inherit; padding: 4px 10px; }
+      #room-panel-message, #room-panel-confirm { margin: 0; padding: 6px 8px; background: #fff3cd; border: 1px solid #e0c36c; border-radius: 4px; }
+      #room-panel-confirm p { margin: 0 0 6px; }
+      #room-panel .buttons { display: flex; gap: 8px; }
     </style>
   </head>
   <body>

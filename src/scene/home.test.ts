@@ -16,6 +16,10 @@ describe('buildHome', () => {
     ;[0, 400, 0, 0, 0, 300].forEach((v, i) => expect(actual[i]).toBeCloseTo(v))
   })
 
+  it('names each floor after its room, so a click on it finds the room', () => {
+    expect(buildHome(sampleHome()).floors.map((f) => f.name)).toEqual(['living', 'bedroom'])
+  })
+
   it('draws the shared wall once: 7 walls for two rooms side by side', () => {
     const home = buildHome(sampleHome())
     expect(home.walls).toHaveLength(7)

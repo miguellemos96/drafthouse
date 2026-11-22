@@ -4,10 +4,10 @@ import * as THREE from 'three'
 import { wallFades } from '../model/fade.ts'
 import type { Item } from '../model/item.ts'
 import { openingsOf, spanOn, swingArc, wallOf, wallPieces, type WallPiece } from '../model/openings.ts'
-import { wallLength, wallsOf, type Plan, type Wall } from '../model/plan.ts'
+import { WALL_THICKNESS, wallLength, wallsOf, type Plan, type Wall } from '../model/plan.ts'
 import { buildItem } from './items.ts'
 
-export const WALL_THICKNESS = 10 // cm
+export { WALL_THICKNESS }
 const FADED_OPACITY = 0.15
 const PANE_THICKNESS = 2 // cm
 const ARC_LIFT = 1 // cm above the floor, so the arc doesn't flicker against it
@@ -15,6 +15,7 @@ const ARC_STEPS = 16
 
 export type HomeView = {
   group: THREE.Group
+  /** One floor per room, in plan order, each named after its room's id. */
   floors: THREE.Mesh[]
   /** One box per wall piece: a wall without openings is one box; one with openings has a box beside, under and above each. */
   walls: { wall: Wall; mesh: THREE.Mesh<THREE.BoxGeometry, THREE.MeshStandardMaterial>; opening?: string }[]
@@ -84,7 +85,12 @@ const arcObject = ({ centre, radius, startAngle, endAngle }: NonNullable<ReturnT
 
 export const buildHome = (plan: Plan, items: Item[] = []): HomeView => {
   const group = new THREE.Group()
-  const floors = plan.rooms.map((room) => floorMesh(room.corners))
+  const floors = plan.rooms.map((room) => {
+    const mesh = floorMesh(room.corners)
+    mesh.name = room.id
+    return mesh
+  })
+  // wallPieces gives each piece its wall's height: the taller of the rooms it borders.
   const walls = wallsOf(plan).flatMap((wall) => wallPieces(plan, wall).map((piece) => ({ wall, mesh: wallMesh(wall, piece), opening: piece.opening })))
   const panes: HomeView['panes'] = []
   const arcs: HomeView['arcs'] = []

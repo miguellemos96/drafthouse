@@ -5,6 +5,7 @@
   "branchPrefix": "factory/",
   "maxFixRounds": 2,
   "maxInconclusive": 2,
+  "maxConflictRounds": 5,
   "logIssue": 1,
   "autoMerge": false
 }

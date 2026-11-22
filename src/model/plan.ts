@@ -14,6 +14,9 @@ export type Room = {
 /** `openings` is missing in homes saved before doors and windows; read it with `openingsOf`. */
 export type Plan = { rooms: Room[]; openings?: Opening[] }
 
+/** Walls stand centred on the plan edges, this thick (cm); their faces are half of it either side. */
+export const WALL_THICKNESS = 10
+
 // One edge of one or more room polygons. A shared edge lists both rooms.
 export type Wall = { a: Point; b: Point; rooms: string[] }
 
