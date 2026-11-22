@@ -1,17 +1,30 @@
-// Draws a plan and its items: one floor per room, one box per wall, one group per item. Plan (x, y) maps to scene (x, z); +Y is up.
+// Draws a plan and its items: one floor per room, the walls as boxes around their doors and windows,
+// a pane per window, a swing arc per door, and one group per item. Plan (x, y) maps to scene (x, z); +Y is up.
 import * as THREE from 'three'
 import { wallFades } from '../model/fade.ts'
 import type { Item } from '../model/item.ts'
-import { wallHeight, wallLength, wallsOf, type Plan, type Wall } from '../model/plan.ts'
+import { openingsOf, spanOn, swingArc, wallOf, wallPieces, type WallPiece } from '../model/openings.ts'
+import { WALL_THICKNESS, wallLength, wallsOf, type Plan, type Wall } from '../model/plan.ts'
 import { buildItem } from './items.ts'
 
-export const WALL_THICKNESS = 10 // cm
+export { WALL_THICKNESS }
 const FADED_OPACITY = 0.15
+const PANE_THICKNESS = 2 // cm
+const ARC_LIFT = 1 // cm above the floor, so the arc doesn't flicker against it
+const ARC_STEPS = 16
 
 export type HomeView = {
   group: THREE.Group
+  /** One floor per room, in plan order, each named after its room's id. */
   floors: THREE.Mesh[]
-  walls: { wall: Wall; mesh: THREE.Mesh<THREE.BoxGeometry, THREE.MeshStandardMaterial> }[]
+  /** One box per wall piece: a wall without openings is one box; one with openings has a box beside, under and above each. */
+  walls: { wall: Wall; mesh: THREE.Mesh<THREE.BoxGeometry, THREE.MeshStandardMaterial>; opening?: string }[]
+  /** A thin pane in each window's hole. */
+  panes: { opening: string; mesh: THREE.Mesh<THREE.BoxGeometry, THREE.MeshStandardMaterial> }[]
+  /** Each door's swing: a flat quarter circle on the floor, shown in the top view only. */
+  arcs: { opening: string; object: THREE.Group }[]
+  /** Shows or hides the doors' swing arcs. */
+  showArcs: (on: boolean) => void
   /** One group per item, in the order given. */
   items: THREE.Group[]
   /** Fades the walls the model says stand between this camera and the rooms; `null` fades none. */
@@ -26,25 +39,76 @@ const floorMesh = (corners: { x: number; y: number }[]) => {
   return new THREE.Mesh(geometry, material)
 }
 
-const wallMesh = (wall: Wall, height: number) => {
+const wallBox = (wall: Wall, from: number, to: number, bottom: number, top: number, material: THREE.Material, depth = WALL_THICKNESS) => {
   const length = wallLength(wall)
-  // One thickness longer, so neighbouring walls overlap at the corners instead of leaving a notch.
-  const geometry = new THREE.BoxGeometry(length + WALL_THICKNESS, height, WALL_THICKNESS)
-  const material = new THREE.MeshStandardMaterial({ color: 0xf2efe9, transparent: true })
-  const mesh = new THREE.Mesh(geometry, material)
-  const dx = wall.b.x - wall.a.x
-  const dz = wall.b.y - wall.a.y
-  mesh.position.set((wall.a.x + wall.b.x) / 2, height / 2, (wall.a.y + wall.b.y) / 2)
+  const dx = (wall.b.x - wall.a.x) / length
+  const dz = (wall.b.y - wall.a.y) / length
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(to - from, top - bottom, depth), material)
+  const mid = (from + to) / 2
+  mesh.position.set(wall.a.x + dx * mid, (bottom + top) / 2, wall.a.y + dz * mid)
   mesh.rotation.y = Math.atan2(-dz, dx) // the box's length runs along the wall
   return mesh
 }
 
+const wallMesh = (wall: Wall, piece: WallPiece) => {
+  const length = wallLength(wall)
+  // The pieces at the wall's ends reach half a thickness further, so neighbouring walls overlap at the
+  // corners instead of leaving a notch.
+  const from = piece.from === 0 ? -WALL_THICKNESS / 2 : piece.from
+  const to = piece.to === length ? length + WALL_THICKNESS / 2 : piece.to
+  const material = new THREE.MeshStandardMaterial({ color: 0xf2efe9, transparent: true })
+  return wallBox(wall, from, to, piece.bottom, piece.top, material) as THREE.Mesh<THREE.BoxGeometry, THREE.MeshStandardMaterial>
+}
+
+const arcObject = ({ centre, radius, startAngle, endAngle }: NonNullable<ReturnType<typeof swingArc>>) => {
+  const points = Array.from({ length: ARC_STEPS + 1 }, (_, i) => {
+    const angle = startAngle + ((endAngle - startAngle) * i) / ARC_STEPS
+    return new THREE.Vector2(centre.x + radius * Math.cos(angle), centre.y + radius * Math.sin(angle))
+  })
+  const outline = [new THREE.Vector2(centre.x, centre.y), ...points]
+  const fill = new THREE.ShapeGeometry(new THREE.Shape(outline))
+  fill.rotateX(Math.PI / 2) // shape (x, y, 0) → scene (x, 0, y)
+  const sector = new THREE.Mesh(fill, new THREE.MeshBasicMaterial({ color: 0x2f80ed, transparent: true, opacity: 0.18, side: THREE.DoubleSide, depthWrite: false }))
+  const line = new THREE.LineLoop(
+    new THREE.BufferGeometry().setFromPoints(outline.map((p) => new THREE.Vector3(p.x, 0, p.y))),
+    new THREE.LineBasicMaterial({ color: 0x2f80ed }),
+  )
+  const group = new THREE.Group()
+  group.add(sector, line)
+  group.position.y = ARC_LIFT
+  group.visible = false
+  // The arc is a drawing on the floor: pointer input goes through it.
+  sector.raycast = () => {}
+  line.raycast = () => {}
+  return group
+}
+
 export const buildHome = (plan: Plan, items: Item[] = []): HomeView => {
   const group = new THREE.Group()
-  const floors = plan.rooms.map((room) => floorMesh(room.corners))
-  const walls = wallsOf(plan).map((wall) => ({ wall, mesh: wallMesh(wall, wallHeight(plan, wall)) }))
+  const floors = plan.rooms.map((room) => {
+    const mesh = floorMesh(room.corners)
+    mesh.name = room.id
+    return mesh
+  })
+  // wallPieces gives each piece its wall's height: the taller of the rooms it borders.
+  const walls = wallsOf(plan).flatMap((wall) => wallPieces(plan, wall).map((piece) => ({ wall, mesh: wallMesh(wall, piece), opening: piece.opening })))
+  const panes: HomeView['panes'] = []
+  const arcs: HomeView['arcs'] = []
+  for (const opening of openingsOf(plan)) {
+    const wall = wallOf(plan, opening.wall)
+    if (!wall) continue // a wall that no longer exists: nothing to draw
+    if (opening.kind === 'window') {
+      const { start, end } = spanOn(opening, wall)
+      const material = new THREE.MeshStandardMaterial({ color: 0xa9cce3, transparent: true, opacity: 0.35, depthWrite: false })
+      const mesh = wallBox(wall, start, end, opening.sillHeight, opening.sillHeight + opening.height, material, PANE_THICKNESS)
+      panes.push({ opening: opening.id, mesh: mesh as THREE.Mesh<THREE.BoxGeometry, THREE.MeshStandardMaterial> })
+    } else {
+      const arc = swingArc(plan, opening)
+      if (arc) arcs.push({ opening: opening.id, object: arcObject(arc) })
+    }
+  }
   const itemGroups = items.map(buildItem)
-  group.add(...floors, ...walls.map((w) => w.mesh), ...itemGroups)
+  group.add(...floors, ...walls.map((w) => w.mesh), ...panes.map((p) => p.mesh), ...arcs.map((a) => a.object), ...itemGroups)
 
   const applyFade = (camera: THREE.Vector3 | null) => {
     for (const { wall, mesh } of walls) {
@@ -53,5 +117,8 @@ export const buildHome = (plan: Plan, items: Item[] = []): HomeView => {
       mesh.material.depthWrite = !faded
     }
   }
-  return { group, floors, walls, items: itemGroups, applyFade }
+  const showArcs = (on: boolean) => {
+    for (const { object } of arcs) object.visible = on
+  }
+  return { group, floors, walls, panes, arcs, showArcs, items: itemGroups, applyFade }
 }

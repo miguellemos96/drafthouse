@@ -21,7 +21,8 @@ const frames = (page: Page) =>
 const toScreen = (page: Page, x: number, y: number, z: number) => page.evaluate(([x, y, z]) => window.drafthouse.toScreen(x, y, z), [x, y, z])
 const changes = (page: Page) => page.evaluate(() => (window as unknown as { changes: number }).changes)
 
-const EDITING = ['#add-room', '#history', '#undo', '#redo', '#add-item', '#add-item-button', '#add-from-link', '#import', '#item-panel input', '#item-duplicate', '#item-delete']
+const EDITING = ['#add-room', '#history', '#undo', '#redo', '#add-item', '#add-item-button', '#add-from-link', '#import', '#item-panel input', '#item-duplicate', '#item-delete',
+  '#snap-toggle', '#opening-tools', '#opening-panel', '#room-panel', '#version-duplicate', '#version-rename', '#version-delete', '#version-rename-form']
 
 test.describe('on a Pixel 7', () => {
   test.use({ viewport, userAgent, deviceScaleFactor, isMobile, hasTouch })
@@ -35,6 +36,7 @@ test.describe('on a Pixel 7', () => {
     await expect(page.getByRole('button', { name: 'Top view' })).toBeVisible()
     await expect(page.locator('#language')).toBeVisible()
     await expect(page.getByRole('button', { name: 'Export' })).toBeVisible()
+    await expect(page.locator('#version-select')).toBeVisible()
 
     await page.locator('#language').selectOption('es')
     await expect(page.locator('#view-only-note')).toHaveText('Usa un ordenador para editar esta casa')
