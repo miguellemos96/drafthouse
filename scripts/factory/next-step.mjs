@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Decides the factory's next step from GitHub state. No AI, no writes.
-// Prints one JSON line: {"step":"idle|verify|fix|work", ...}.
+// Prints one JSON line: {"step":"idle|conflicts|verify|fix|work", ...}.
 //
 // Usage:
 //   node scripts/factory/next-step.mjs            next step as JSON
@@ -18,7 +18,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const HOME = join(homedir(), '.factory')
-const DEFAULTS = { start: '21:00', cutoff: '03:00', maxFixRounds: 2, maxInconclusive: 2, branchPrefix: 'factory/' }
+const DEFAULTS = { start: '21:00', cutoff: '03:00', maxFixRounds: 2, maxInconclusive: 2, maxConflictRounds: 5, branchPrefix: 'factory/' }
 
 const HOLD_LABELS = new Set(['needs-info', 'human', 'needs-triage'])
 
@@ -55,6 +55,19 @@ export const withOpenBlockers = (issues, openNumbers) =>
 
 const countComments = (pr, heading) => (pr.comments ?? []).filter((c) => c.body.startsWith(heading)).length
 
+// The worker's comments after a conflicts step: "## Merged main" when it resolved them, "## Conflicts: parked" when it couldn't.
+export const MERGED_MAIN = '## Merged main'
+export const CONFLICTS_PARKED = '## Conflicts: parked'
+
+/** True when the factory should merge main into this PR: it conflicts, the worker hasn't given up on it, and it has rounds left. */
+export const needsConflictFix = (pr, maxRounds) => {
+  if (pr.mergeable !== 'CONFLICTING') return false
+  const outcomes = (pr.comments ?? []).filter((c) => c.body.startsWith(MERGED_MAIN) || c.body.startsWith(CONFLICTS_PARKED))
+  // A park waits for the human: they resolve the conflict, or delete the park comment to let the factory try again.
+  if (outcomes.at(-1)?.body.startsWith(CONFLICTS_PARKED)) return false
+  return outcomes.length < maxRounds
+}
+
 /** Queue order: workable issues only, bugs first, then oldest first. */
 export const orderQueue = (issues, { me, openPrIssues }) =>
   issues
@@ -78,7 +91,7 @@ const checksGreen = (pr) => {
   return checks.length > 0 && checks.every((c) => ['SUCCESS', 'NEUTRAL', 'SKIPPED'].includes(c.conclusion ?? c.state))
 }
 
-/** Finish before starting: verify, then fix, then new work. */
+/** Finish before starting: resolve conflicts, then verify, then fix, then new work. */
 export const pickStep = ({ now, config, stop, prs, issues, me }) => {
   if (stop) return { step: 'idle', reason: 'stop file' }
   if (!inWindow(now, config.start, config.cutoff)) return { step: 'idle', reason: 'outside hours' }
@@ -86,13 +99,21 @@ export const pickStep = ({ now, config, stop, prs, issues, me }) => {
   const factoryPrs = prs.filter((p) => p.headRefName.startsWith(config.branchPrefix) && !p.isDraft)
   const issueOf = (pr) => pr.closingIssuesReferences?.[0]?.number
 
+  // A PR that conflicts with main can't be merged, and its checks don't run: merge main into it first, oldest PR first.
+  const oldestFirst = [...factoryPrs].sort((a, b) => (a.number ?? 0) - (b.number ?? 0))
+  for (const pr of oldestFirst) {
+    if (needsConflictFix(pr, config.maxConflictRounds)) return { step: 'conflicts', pr: pr.url, issue: issueOf(pr) }
+  }
+
   for (const pr of factoryPrs) {
+    if (pr.mergeable === 'CONFLICTING') continue
     const verdict = verdictOf(pr)
     if (verdict === null && checksGreen(pr)) return { step: 'verify', pr: pr.url, issue: issueOf(pr) }
     if (verdict === 'ERROR' && countComments(pr, '## Verifier: INCONCLUSIVE') < config.maxInconclusive)
       return { step: 'verify', pr: pr.url, issue: issueOf(pr) }
   }
   for (const pr of factoryPrs) {
+    if (pr.mergeable === 'CONFLICTING') continue
     if (verdictOf(pr) === 'FAILURE' && countComments(pr, '## Verifier: FAIL') <= config.maxFixRounds)
       return { step: 'fix', pr: pr.url, issue: issueOf(pr) }
   }
@@ -131,7 +152,7 @@ const main = () => {
   const config = loadConfig()
   const me = execFileSync('gh', ['api', 'user', '--jq', '.login'], { encoding: 'utf8' }).trim()
   const prs = gh('pr', 'list', '--state', 'open', '--author', '@me', '--json',
-    'url,number,headRefName,isDraft,statusCheckRollup,comments,closingIssuesReferences')
+    'url,number,headRefName,isDraft,mergeable,statusCheckRollup,comments,closingIssuesReferences')
   // A blocker counts while it is an open issue or an open PR (of anyone): merged or closed means done.
   const openNumbers = new Set([
     ...gh('issue', 'list', '--state', 'open', '--limit', '500', '--json', 'number'),
