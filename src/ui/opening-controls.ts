@@ -22,6 +22,8 @@ export type OpeningControlsOptions = {
   store: Store
   view: () => HomeView
   isTopView: () => boolean
+  /** While this returns true, the pointer neither selects nor drags doors and windows (another tool has it). */
+  paused?: () => boolean
   /** Draws the home with this plan instead of the stored one, or the stored one again for null. */
   preview: (plan: Plan | null) => void
   /** Called with the selected opening (or null) whenever the selection or the home changes. */
@@ -41,7 +43,7 @@ export type OpeningControls = {
 type Drag = { opening: Opening; grab: number; plane: THREE.Plane; moved: Plan | null }
 
 export const mountOpeningControls = (options: OpeningControlsOptions): OpeningControls => {
-  const { parent, surface, canvas, camera, controls, store, view, isTopView, preview, onSelect } = options
+  const { parent, surface, canvas, camera, controls, store, view, isTopView, preview, onSelect, paused = () => false } = options
   let placing: OpeningKind | null = null
   let selected: string | null = null
   let drag: Drag | null = null
@@ -120,7 +122,7 @@ export const mountOpeningControls = (options: OpeningControlsOptions): OpeningCo
   }
 
   const onPointerDown = (event: PointerEvent) => {
-    if (event.button !== 0 || !event.isPrimary || drag || !isTopView()) return
+    if (event.button !== 0 || !event.isPrimary || drag || !isTopView() || paused()) return
     aim(event)
     const hit = pickWall()
     const plan = store.get().plan

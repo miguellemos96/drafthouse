@@ -1,16 +1,19 @@
 // Entry point: the saved home (or the sample home) in 3D, with orbit controls, a top view,
 // autosave, undo and redo, Export and Import, items you select, move (free or snapped), rotate and edit, products added from a link,
 // rooms you select to rename, change the height of or delete, and doors and windows placed, dragged and edited in the top view.
+// While an item is dragged, the distances to the walls and the nearest item show; the Measure tool measures between two points.
 // Rooms, items and panels are added issue by issue (see docs/spec.md).
 import * as THREE from 'three'
 import { loadLanguage } from './i18n/index.ts'
 import { loadHome, saveHome } from './model/autosave.ts'
+import { dragDistances } from './model/distances.ts'
 import { currentVersion } from './model/home.ts'
-import type { Plan } from './model/plan.ts'
+import { wallsOf, type Plan } from './model/plan.ts'
 import { newSampleHome } from './model/sample.ts'
 import { createStore, type Store } from './model/store.ts'
 import { createCameraRig, type CameraRig } from './scene/camera.ts'
 import { buildHome, type HomeView } from './scene/home.ts'
+import { createMeasureView, floorLine } from './scene/measures.ts'
 import { createSelectionView } from './scene/selection.ts'
 import { createSnapGuides } from './scene/snap-guides.ts'
 import { mountAddItem } from './ui/add-item.ts'
@@ -23,6 +26,7 @@ import { applyLanguage, mountLanguageSwitcher } from './ui/language-switcher.ts'
 import { mountOpeningControls, type OpeningControls } from './ui/opening-controls.ts'
 import { mountOpeningPanel } from './ui/opening-panel.ts'
 import { mountRoomPanel } from './ui/room-panel.ts'
+import { mountTapeMeasure } from './ui/tape-measure.ts'
 import { mountUndoRedo } from './ui/undo-redo.ts'
 import { mountViewToggle } from './ui/view-toggle.ts'
 
@@ -95,6 +99,8 @@ const itemPanel = mountItemPanel(document.body, store, {
   duplicate: () => itemControls.duplicateSelected(),
   remove: () => itemControls.deleteSelected(),
 })
+const measures = createMeasureView(scene, container, camera, renderer.domElement)
+const tapeMeasure = mountTapeMeasure({ parent: document.body, surface: container, canvas: renderer.domElement, camera, view: () => home, measures })
 const openingPanel = mountOpeningPanel(document.body, store, () => openingControls.deselect())
 // Mounted before the item controls, so a press on a door or window in the top view reaches it first.
 const openingControls: OpeningControls = mountOpeningControls({
@@ -106,6 +112,7 @@ const openingControls: OpeningControls = mountOpeningControls({
   store,
   view: () => home,
   isTopView: rig.isTopView,
+  paused: tapeMeasure.active,
   preview: (plan) => draw(plan ?? store.get().plan),
   onSelect: (opening) => {
     if (opening) itemControls.deselect()
@@ -132,6 +139,13 @@ const itemControls: ItemControls = mountItemControls({
   onSelectRoom: (room) => {
     if (room) openingControls.deselect()
     roomPanel.show(room)
+  },
+  paused: tapeMeasure.active,
+  onDrag: (item) => {
+    if (!item) return measures.showDrag([])
+    const home = store.get()
+    const found = dragDistances(item, wallsOf(home.plan), currentVersion(home).items)
+    measures.showDrag([...found.walls.map((line) => floorLine(line, line.side)), ...(found.item ? [floorLine(found.item, 'item')] : [])])
   },
 })
 
@@ -166,6 +180,7 @@ mountLanguageSwitcher(document.body, () => {
   undoRedo.render()
   addItem.render()
   itemPanel.render()
+  tapeMeasure.render()
   openingControls.render()
   openingPanel.render()
   snapToggle.render()
@@ -187,4 +202,5 @@ renderer.setAnimationLoop(() => {
   home.applyFade(rig.isTopView() ? null : camera.position)
   home.showArcs(rig.isTopView())
   renderer.render(scene, camera)
+  measures.update()
 })
