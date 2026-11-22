@@ -1,5 +1,6 @@
 // Entry point: the saved home (or the sample home) in 3D, with orbit controls, a top view,
-// autosave, undo and redo, Export and Import, items you select, move, rotate and edit, and products added from a link.
+// autosave, undo and redo, Export and Import, items you select, move, rotate and edit, products added from a link,
+// and rooms you select to rename, change the height of or delete.
 // Rooms, items and panels are added issue by issue (see docs/spec.md).
 import * as THREE from 'three'
 import { loadLanguage } from './i18n/index.ts'
@@ -16,6 +17,7 @@ import { mountFileButtons } from './ui/file-buttons.ts'
 import { mountItemControls, type ItemControls } from './ui/item-controls.ts'
 import { mountItemPanel } from './ui/item-panel.ts'
 import { applyLanguage, mountLanguageSwitcher } from './ui/language-switcher.ts'
+import { mountRoomPanel } from './ui/room-panel.ts'
 import { mountUndoRedo } from './ui/undo-redo.ts'
 import { mountViewToggle } from './ui/view-toggle.ts'
 
@@ -32,6 +34,8 @@ declare global {
       rig: CameraRig
       /** The id of the selected item, or `null`. */
       selectedItemId: () => string | null
+      /** The id of the selected room, or `null`. */
+      selectedRoomId: () => string | null
       /** Where a point in the home shows on the page, in client pixels. */
       toScreen: (x: number, y: number, z: number) => { x: number; y: number }
     }
@@ -77,6 +81,7 @@ const itemPanel = mountItemPanel(document.body, store, {
   duplicate: () => itemControls.duplicateSelected(),
   remove: () => itemControls.deleteSelected(),
 })
+const roomPanel = mountRoomPanel(document.body, store)
 const itemControls: ItemControls = mountItemControls({
   surface: container,
   canvas: renderer.domElement,
@@ -86,12 +91,14 @@ const itemControls: ItemControls = mountItemControls({
   view: () => home,
   selection: createSelectionView(scene),
   onSelect: itemPanel.show,
+  onSelectRoom: roomPanel.show,
 })
 
 window.drafthouse = {
   store,
   rig,
   selectedItemId: itemControls.selectedId,
+  selectedRoomId: itemControls.selectedRoomId,
   toScreen: (x, y, z) => {
     const ndc = new THREE.Vector3(x, y, z).project(camera)
     const rect = renderer.domElement.getBoundingClientRect()
@@ -112,6 +119,7 @@ mountLanguageSwitcher(document.body, () => {
   undoRedo.render()
   addItem.render()
   itemPanel.render()
+  roomPanel.render()
 })
 
 const resize = () => {
