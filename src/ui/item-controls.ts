@@ -1,8 +1,10 @@
 // Select, move and rotate items with the pointer and the keyboard, in the orbit view and the top view.
 // The maths is in src/model/move.ts. A drag or a turn shows live in the scene and reaches the
 // store once, when it ends, so autosave and undo see one change per move.
+// Duplicate (Ctrl+D or ⌘D) and Delete (Delete or Backspace) act on the selected item, each as one change.
 import * as THREE from 'three'
-import { currentVersion, updateItem } from '../model/home.ts'
+import { duplicateItem } from '../model/editItem.ts'
+import { addItem, currentVersion, removeItem, updateItem } from '../model/home.ts'
 import type { FloorPoint, Item } from '../model/item.ts'
 import { dragPosition, pointerAngle, rotateByHandle, stepRotation } from '../model/move.ts'
 import { itemPlacement } from '../model/placement.ts'
@@ -10,6 +12,7 @@ import type { Room } from '../model/plan.ts'
 import type { Store } from '../model/store.ts'
 import type { HomeView } from '../scene/home.ts'
 import { tintFloor, tintItem, type SelectionView } from '../scene/selection.ts'
+import { isMacPlatform, isTypingTarget, itemShortcut } from './shortcuts.ts'
 
 /** A press that moves less than this many pixels before release is a click. */
 const CLICK_SLOP = 5
@@ -32,6 +35,7 @@ export type ItemControlsOptions = {
   onSelect?: (item: Item | null) => void
   /** Called with the selected room (or null) whenever the selection or the home changes. */
   onSelectRoom?: (room: Room | null) => void
+  mac?: boolean
 }
 
 export type ItemControls = {
@@ -42,6 +46,10 @@ export type ItemControls = {
   clear: () => void
   /** Call after the home view is rebuilt, so the highlight lands on the new meshes. */
   refresh: () => void
+  /** Copies the selected item 20 cm to the right and towards the camera, and selects the copy. */
+  duplicateSelected: () => void
+  /** Removes the selected item and clears the selection. */
+  deleteSelected: () => void
 }
 
 const FLOOR = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)
@@ -49,7 +57,7 @@ const FLOOR = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)
 const isTyping = (target: EventTarget | null) =>
   target instanceof HTMLElement && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
 
-export const mountItemControls = ({ surface, canvas, camera, controls, store, view, selection, onSelect, onSelectRoom }: ItemControlsOptions): ItemControls => {
+export const mountItemControls = ({ surface, canvas, camera, controls, store, view, selection, onSelect, onSelectRoom, mac = isMacPlatform(navigator.platform) }: ItemControlsOptions): ItemControls => {
   let selected: string | null = null
   let selectedRoom: string | null = null
   let gesture: Gesture | null = null
@@ -188,7 +196,32 @@ export const mountItemControls = ({ surface, canvas, camera, controls, store, vi
     if (ended.kind !== 'press') preview(ended.item)
   }
 
-  const onKeyDown =(event: KeyboardEvent) => {
+  const duplicateSelected = () => {
+    const item = findItem(selected)
+    if (!item || gesture) return
+    const right = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0)
+    const copy = duplicateItem(item, crypto.randomUUID(), { x: right.x, z: right.z })
+    selected = copy.id // set first, so the refresh after the change shows the copy as selected
+    store.set(addItem(store.get(), copy))
+  }
+
+  const deleteSelected = () => {
+    const item = findItem(selected)
+    if (!item || gesture) return
+    selected = null
+    store.set(removeItem(store.get(), item.id))
+  }
+
+  const onKeyDown = (event: KeyboardEvent) => {
+    // Like the other shortcuts, these are ignored while typing in a field.
+    const action = isTypingTarget(event.target) || isTyping(event.target) ? null : itemShortcut(event, mac)
+    if (action) {
+      if (!findItem(selected)) return
+      event.preventDefault() // Ctrl+D would otherwise bookmark the page
+      if (action === 'duplicate') duplicateSelected()
+      else deleteSelected()
+      return
+    }
     if (isTyping(event.target) || event.ctrlKey || event.metaKey || event.altKey) return
     if (event.key === 'Escape') {
       select(null)
@@ -215,5 +248,5 @@ export const mountItemControls = ({ surface, canvas, camera, controls, store, vi
     show(findItem(selected))
   }
 
-  return { selectedId: () => selected, selectedRoomId: () => selectedRoom, clear: () => select(null), refresh }
+  return { selectedId: () => selected, selectedRoomId: () => selectedRoom, clear: () => select(null), refresh, duplicateSelected, deleteSelected }
 }

@@ -91,4 +91,8 @@ export const es: Strings = {
   'link.error.nothing-found': 'No se ha encontrado nada sobre el producto en la página.',
   'item.panel.photo': 'Foto del producto',
   'item.panel.link': 'Abrir la página del producto',
+  'item.panel.duplicate': 'Duplicar',
+  'item.panel.duplicate.title': 'Duplicar ({keys})',
+  'item.panel.delete': 'Eliminar',
+  'item.panel.delete.title': 'Eliminar (tecla Supr)',
 }

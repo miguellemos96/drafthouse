@@ -22,3 +22,13 @@ export function isTypingTarget(target: EventTarget | null): boolean {
   if (target.isContentEditable || target instanceof HTMLTextAreaElement) return true
   return target instanceof HTMLInputElement && !NOT_TEXT.has(target.type)
 }
+
+/** Which keys duplicate and delete the selected item. Duplicate: Ctrl+D (⌘D on Mac). Delete: Delete or Backspace. */
+export function itemShortcut(event: KeyPress, mac: boolean): 'duplicate' | 'delete' | null {
+  const command = mac ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey
+  if (event.altKey) return null
+  if (command && !event.shiftKey && event.key.toLowerCase() === 'd') return 'duplicate'
+  const plain = !event.ctrlKey && !event.metaKey && !event.shiftKey
+  if (plain && (event.key === 'Delete' || event.key === 'Backspace')) return 'delete'
+  return null
+}
