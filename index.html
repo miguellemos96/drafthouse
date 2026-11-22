@@ -13,6 +13,16 @@
       #file-buttons button { font: inherit; padding: 4px 10px; }
       #history { position: fixed; top: 52px; left: 12px; z-index: 1; display: flex; gap: 8px; }
       #history button { font: inherit; padding: 4px 10px; }
+      #versions { position: fixed; top: 52px; left: 50%; transform: translateX(-50%); z-index: 1; display: grid; gap: 6px; width: 300px; max-width: calc(100vw - 24px); box-sizing: border-box; padding: 8px 10px; background: rgba(255, 255, 255, 0.92); border: 1px solid #ccc; border-radius: 6px; }
+      #versions label, #versions .row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+      #versions select, #versions input { font: inherit; flex: 1; min-width: 0; padding: 2px 4px; }
+      #versions input[aria-invalid="true"] { border-color: #c0392b; }
+      #versions form { display: grid; gap: 6px; margin: 0; }
+      #versions .buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+      #versions button { font: inherit; padding: 4px 10px; }
+      #version-confirm { display: grid; gap: 6px; padding: 6px 8px; background: #fff3cd; border: 1px solid #e0c36c; border-radius: 4px; }
+      #version-confirm p { margin: 0; }
+      #versions [hidden], #versions .buttons[hidden] { display: none; }
       #snap-toggle { position: fixed; top: 92px; left: 12px; z-index: 1; font: inherit; padding: 4px 10px; }
       #snap-toggle[aria-pressed="true"] { background: #2f80ed; color: #fff; border: 1px solid #1d5fbf; border-radius: 3px; }
       #file-message { flex-basis: 100%; margin: 0; padding: 6px 10px; background: #fff3cd; border: 1px solid #e0c36c; border-radius: 4px; text-align: center; }

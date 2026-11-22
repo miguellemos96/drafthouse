@@ -1,7 +1,8 @@
 // Entry point: the saved home (or the sample home) in 3D, with orbit controls, a top view,
-// autosave, undo and redo, Export and Import, items you select, move (free or snapped), rotate and edit, products added from a link,
-// rooms you select to rename, change the height of or delete, and doors and windows placed, dragged and edited in the top view.
-// While an item is dragged, the distances to the walls and the nearest item show; the Measure tool measures between two points.
+// autosave, undo and redo, Export and Import, versions you switch, duplicate, rename and delete, items you select, move (free or snapped),
+// rotate and edit, products added from a link, rooms you select to rename, change the height of or delete, and doors and windows
+// placed, dragged and edited in the top view. While an item is dragged, the distances to the walls and the nearest item show;
+// the Measure tool measures between two points.
 // Rooms, items and panels are added issue by issue (see docs/spec.md).
 import * as THREE from 'three'
 import { loadLanguage } from './i18n/index.ts'
@@ -28,6 +29,7 @@ import { mountOpeningPanel } from './ui/opening-panel.ts'
 import { mountRoomPanel } from './ui/room-panel.ts'
 import { mountTapeMeasure } from './ui/tape-measure.ts'
 import { mountUndoRedo } from './ui/undo-redo.ts'
+import { mountVersionBar } from './ui/version-bar.ts'
 import { mountViewToggle } from './ui/view-toggle.ts'
 
 loadLanguage(navigator.languages)
@@ -171,6 +173,7 @@ const toggle = mountViewToggle(document.body, rig.isTopView, (on) => {
 const fileButtons = mountFileButtons(document.body, store)
 const addRoom = mountAddRoom(document.body, store)
 const undoRedo = mountUndoRedo(document.body, store)
+const versionBar = mountVersionBar(document.body, store)
 const addItem = mountAddItem(document.body, store, rig.lookPoint)
 mountLanguageSwitcher(document.body, () => {
   applyLanguage()
@@ -178,6 +181,7 @@ mountLanguageSwitcher(document.body, () => {
   fileButtons.render()
   addRoom.render()
   undoRedo.render()
+  versionBar.render()
   addItem.render()
   itemPanel.render()
   tapeMeasure.render()
