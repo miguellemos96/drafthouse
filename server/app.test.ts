@@ -7,6 +7,7 @@ import path from 'node:path'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { createApp } from './app.ts'
 import type { ReadLinkDeps } from './readLink.ts'
+import { createRateLimiter } from './reader/safety.ts'
 
 let distDir: string
 let close: (() => Promise<void>) | undefined
@@ -40,8 +41,8 @@ const deps: ReadLinkDeps = {
   allow: () => true,
 }
 
-const start = async (readLink: ReadLinkDeps = deps) => {
-  const server = createApp({ distDir, readLink })
+const start = async (readLink: ReadLinkDeps = deps, clientIpHeader?: string) => {
+  const server = createApp({ distDir, readLink, clientIpHeader })
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
   close = () => new Promise((resolve) => server.close(() => resolve()))
   return `http://127.0.0.1:${(server.address() as AddressInfo).port}`
@@ -80,6 +81,40 @@ describe('server', () => {
     expect(await response.json()).toEqual({ error: 'rate-limited' })
     expect(seen).toHaveLength(1)
     expect(seen[0]).toMatch(/127\.0\.0\.1$/)
+  })
+
+  it('rate-limits by the CLIENT_IP_HEADER address when it is set', async () => {
+    const base = await start({ ...deps, allow: createRateLimiter() }, 'true-client-ip')
+    const from = (ip: string) =>
+      fetch(`${base}/api/read-link`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'True-Client-IP': ip },
+        body: JSON.stringify({ url: 'https://shop.example/cama' }),
+      })
+    for (let i = 0; i < 20; i++) expect((await from('1.2.3.4')).status).toBe(200)
+    const twentyFirst = await from('1.2.3.4')
+    expect(twentyFirst.status).toBe(429)
+    expect(await twentyFirst.json()).toEqual({ error: 'rate-limited' })
+    expect((await from('5.6.7.8')).status).toBe(200)
+  })
+
+  it('ignores True-Client-IP when CLIENT_IP_HEADER is not set', async () => {
+    const seen: string[] = []
+    const base = await start({ ...deps, allow: (ip) => (seen.push(ip), true) })
+    await fetch(`${base}/api/read-link`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'True-Client-IP': '1.2.3.4' },
+      body: JSON.stringify({ url: 'https://shop.example/cama' }),
+    })
+    expect(seen).toHaveLength(1)
+    expect(seen[0]).toMatch(/127\.0\.0\.1$/)
+  })
+
+  it('answers the health check with 200 ok', async () => {
+    const base = await start()
+    const response = await fetch(`${base}/healthz`)
+    expect(response.status).toBe(200)
+    expect(await response.text()).toBe('ok')
   })
 
   it('accepts only POST on the API', async () => {
