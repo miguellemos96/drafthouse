@@ -90,10 +90,14 @@ const segmentsTouch = (p1: Point, p2: Point, q1: Point, q2: Point) => {
   return onSegment(p1, q1, q2) || onSegment(p2, q1, q2) || onSegment(q1, p1, p2) || onSegment(q2, p1, p2)
 }
 
-const validateOutline = (corners: Point[]) => {
-  if (corners.length < 3) throw new Error('Room outline needs at least 3 corners.')
+/** Why an outline can't be a room: too few corners, an edge of no length, or edges that cross or touch. */
+export type OutlineError = 'too-few' | 'zero-edge' | 'crosses'
+
+/** What is wrong with a room outline, or `null` when it can be a room. */
+export const outlineError = (corners: Point[]): OutlineError | null => {
+  if (corners.length < 3) return 'too-few'
   const edges = edgesOf(corners)
-  if (edges.some(([a, b]) => samePoint(a, b))) throw new Error('Room outline has a zero-length edge.')
+  if (edges.some(([a, b]) => samePoint(a, b))) return 'zero-edge'
   const n = edges.length
   for (let i = 0; i < n; i++) {
     for (let j = i + 1; j < n; j++) {
@@ -101,15 +105,27 @@ const validateOutline = (corners: Point[]) => {
       const [c, d] = edges[j]
       const adjacent = j === i + 1 || (i === 0 && j === n - 1)
       if (!adjacent) {
-        if (segmentsTouch(a, b, c, d)) throw new Error('Room outline crosses itself.')
+        if (segmentsTouch(a, b, c, d)) return 'crosses'
         continue
       }
       // Adjacent edges share one corner; they may only meet there, so the far end of
       // either edge must not lie on the other (an edge doubling back on itself).
       const [farI, farJ] = j === i + 1 ? [a, d] : [b, c]
-      if (onSegment(farJ, a, b) || onSegment(farI, c, d)) throw new Error('Room outline crosses itself.')
+      if (onSegment(farJ, a, b) || onSegment(farI, c, d)) return 'crosses'
     }
   }
+  return null
+}
+
+const OUTLINE_MESSAGES: Record<OutlineError, string> = {
+  'too-few': 'Room outline needs at least 3 corners.',
+  'zero-edge': 'Room outline has a zero-length edge.',
+  crosses: 'Room outline crosses itself.',
+}
+
+const validateOutline = (corners: Point[]) => {
+  const error = outlineError(corners)
+  if (error) throw new Error(OUTLINE_MESSAGES[error])
 }
 
 // A wall is as high as its room; a wall shared by rooms of different heights takes the taller.

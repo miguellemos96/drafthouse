@@ -1,7 +1,8 @@
 // Entry point: the saved home (or the sample home) in 3D, with orbit controls, a top view,
 // autosave, undo and redo, Export and Import, versions you switch, duplicate, rename and delete, items you select, move (free or snapped),
 // rotate and edit, products added from a link, rooms you select to rename, change the height of or delete, and doors and windows
-// placed, dragged and edited in the top view. While an item is dragged, the distances to the walls and the nearest item show;
+// placed, dragged and edited in the top view. Rooms of any shape are drawn corner by corner in the top view, and a selected
+// room's corners are dragged to change its outline. While an item is dragged, the distances to the walls and the nearest item show;
 // the Measure tool measures between two points.
 // On a phone it is view only: look, orbit, measure, switch the view, the version and the language, Export, and tap an item to see it.
 // Rooms, items and panels are added issue by issue (see docs/spec.md).
@@ -15,11 +16,14 @@ import { newSampleHome } from './model/sample.ts'
 import { createStore, type Store } from './model/store.ts'
 import { createCameraRig, type CameraRig } from './scene/camera.ts'
 import { buildHome, type HomeView } from './scene/home.ts'
+import { createCornerHandles } from './scene/corner-handles.ts'
 import { createMeasureView, floorLine } from './scene/measures.ts'
 import { createSelectionView } from './scene/selection.ts'
 import { createSnapGuides } from './scene/snap-guides.ts'
 import { mountAddItem } from './ui/add-item.ts'
 import { mountAddRoom } from './ui/add-room.ts'
+import { mountCornerControls } from './ui/corner-controls.ts'
+import { mountDrawRoom } from './ui/draw-room.ts'
 import { currentDevice, isViewOnly } from './ui/device.ts'
 import { mountFileButtons } from './ui/file-buttons.ts'
 import { mountItemControls, type ItemControls } from './ui/item-controls.ts'
@@ -114,7 +118,49 @@ const selection = createSelectionView(scene)
 selection.handle.visible = !viewOnly
 const measures = createMeasureView(scene, container, camera, renderer.domElement)
 const tapeMeasure = mountTapeMeasure({ parent: document.body, surface: container, canvas: renderer.domElement, camera, view: () => home, measures })
+/** Switches between the orbit view and the top view, and tells the tools that care. */
+const setTopView = (on: boolean) => {
+  rig.setTopView(on)
+  // Doors and windows are placed and dragged in the top view only, and rooms drawn there.
+  if (!on) openingControls.deselect()
+  openingControls.render()
+  drawRoom?.render()
+  toggle.render()
+}
 // View only (phones): like Add room and Add item, these editing controls aren't created at all.
+// Mounted first, so while a room is being drawn its clicks reach no other tool.
+const drawRoom = viewOnly
+  ? null
+  : mountDrawRoom({
+      parent: document.body,
+      surface: container,
+      canvas: renderer.domElement,
+      camera,
+      store,
+      isTopView: rig.isTopView,
+      enterTopView: () => setTopView(true),
+      measures,
+      dots: createCornerHandles(scene, 0x2f80ed),
+      onStart: () => {
+        itemControls.clear()
+        openingControls.deselect()
+      },
+      paused: tapeMeasure.active,
+    })
+const drawing = () => drawRoom?.active() ?? false
+// Then the selected room's corner handles, before the doors and windows that sit on the same walls.
+const cornerControls = viewOnly
+  ? null
+  : mountCornerControls({
+      surface: container,
+      canvas: renderer.domElement,
+      camera,
+      controls,
+      store,
+      handles: createCornerHandles(scene, 0x1d3f66),
+      preview: (plan) => draw(plan ?? store.get().plan),
+      paused: () => tapeMeasure.active() || drawing(),
+    })
 const openingPanel = viewOnly ? null : mountOpeningPanel(document.body, store, () => openingControls.deselect())
 // Mounted before the item controls, so a press on a door or window in the top view reaches it first.
 const openingControls: OpeningControls = viewOnly
@@ -128,7 +174,7 @@ const openingControls: OpeningControls = viewOnly
       store,
       view: () => home,
       isTopView: rig.isTopView,
-      paused: tapeMeasure.active,
+      paused: () => tapeMeasure.active() || drawing(),
       preview: (plan) => draw(plan ?? store.get().plan),
       onSelect: (opening) => {
         if (opening) itemControls.deselect()
@@ -155,8 +201,9 @@ const itemControls: ItemControls = mountItemControls({
   onSelectRoom: (room) => {
     if (room) openingControls.deselect()
     roomPanel?.show(room)
+    cornerControls?.show(room)
   },
-  paused: tapeMeasure.active,
+  paused: () => tapeMeasure.active() || drawing(),
   onDrag: (item) => {
     if (!item) return measures.showDrag([])
     const home = store.get()
@@ -180,18 +227,13 @@ window.drafthouse = {
   },
 }
 
-const toggle = mountViewToggle(document.body, rig.isTopView, (on) => {
-  rig.setTopView(on)
-  // Doors and windows are placed and dragged in the top view only.
-  if (!on) openingControls.deselect()
-  openingControls.render()
-})
+const toggle = mountViewToggle(document.body, rig.isTopView, setTopView)
 const fileButtons = mountFileButtons(document.body, store, { canImport: !viewOnly })
 // On a phone, versions can be switched but not duplicated, renamed or deleted.
 const versionBar = mountVersionBar(document.body, store, { canEdit: !viewOnly })
 // Each panel has a `render` that redraws its text in the current language.
 const panels: { render: () => void }[] = [toggle, fileButtons, versionBar, itemPanel, tapeMeasure, openingControls]
-for (const panel of [openingPanel, snapToggle, roomPanel]) if (panel) panels.push(panel)
+for (const panel of [openingPanel, snapToggle, roomPanel, drawRoom]) if (panel) panels.push(panel)
 if (viewOnly) {
   const note = document.createElement('p')
   note.id = 'view-only-note'
