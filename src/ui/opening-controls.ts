@@ -105,7 +105,7 @@ export const mountOpeningControls = (options: OpeningControlsOptions): OpeningCo
   /** The wall under the pointer (through its pieces or a window's pane), and where on it. */
   const pickWall = (): { wall: Wall; point: THREE.Vector3 } | null => {
     const home = view()
-    const [hit] = raycaster.intersectObjects([...home.walls.map((w) => w.mesh), ...home.panes.map((p) => p.mesh)])
+    const [hit] = raycaster.intersectObjects([...home.walls.map((w) => w.mesh), ...home.panes.map((p) => p.mesh)].filter((mesh) => mesh.visible))
     if (!hit) return null
     const piece = home.walls.find((w) => w.mesh === hit.object)
     if (piece) return { wall: piece.wall, point: hit.point }

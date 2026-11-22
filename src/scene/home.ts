@@ -5,6 +5,7 @@ import { wallFades } from '../model/fade.ts'
 import type { Item } from '../model/item.ts'
 import { openingsOf, spanOn, swingArc, wallOf, wallPieces, type WallPiece } from '../model/openings.ts'
 import { WALL_THICKNESS, wallLength, wallsOf, type Plan, type Wall } from '../model/plan.ts'
+import { itemVisible, wallVisible, type HiddenRooms } from '../model/visibility.ts'
 import { buildItem } from './items.ts'
 
 export { WALL_THICKNESS }
@@ -29,6 +30,8 @@ export type HomeView = {
   items: THREE.Group[]
   /** Fades the walls the model says stand between this camera and the rooms; `null` fades none. */
   applyFade: (camera: THREE.Vector3 | null) => void
+  /** Hides the hidden rooms' floors, the walls only they border with their doors and windows, and the items inside them. */
+  applyHidden: (hidden: HiddenRooms) => void
 }
 
 const floorMesh = (corners: { x: number; y: number }[]) => {
@@ -94,9 +97,11 @@ export const buildHome = (plan: Plan, items: Item[] = []): HomeView => {
   const walls = wallsOf(plan).flatMap((wall) => wallPieces(plan, wall).map((piece) => ({ wall, mesh: wallMesh(wall, piece), opening: piece.opening })))
   const panes: HomeView['panes'] = []
   const arcs: HomeView['arcs'] = []
+  const wallOfOpening = new Map<string, Wall>()
   for (const opening of openingsOf(plan)) {
     const wall = wallOf(plan, opening.wall)
     if (!wall) continue // a wall that no longer exists: nothing to draw
+    wallOfOpening.set(opening.id, wall)
     if (opening.kind === 'window') {
       const { start, end } = spanOn(opening, wall)
       const material = new THREE.MeshStandardMaterial({ color: 0xa9cce3, transparent: true, opacity: 0.35, depthWrite: false })
@@ -117,8 +122,23 @@ export const buildHome = (plan: Plan, items: Item[] = []): HomeView => {
       mesh.material.depthWrite = !faded
     }
   }
-  const showArcs = (on: boolean) => {
-    for (const { object } of arcs) object.visible = on
+  let arcsOn = false
+  let hiddenRooms: HiddenRooms = new Set()
+  const openingShown = (id: string) => {
+    const wall = wallOfOpening.get(id)
+    return !wall || wallVisible(wall, hiddenRooms)
   }
-  return { group, floors, walls, panes, arcs, showArcs, items: itemGroups, applyFade }
+  const showArcs = (on: boolean) => {
+    arcsOn = on
+    for (const { opening, object } of arcs) object.visible = on && openingShown(opening)
+  }
+  const applyHidden = (hidden: HiddenRooms) => {
+    hiddenRooms = hidden
+    for (const floor of floors) floor.visible = !hidden.has(floor.name)
+    for (const { wall, mesh } of walls) mesh.visible = wallVisible(wall, hidden)
+    for (const { opening, mesh } of panes) mesh.visible = openingShown(opening)
+    items.forEach((item, i) => (itemGroups[i].visible = itemVisible(plan, item, hidden)))
+    showArcs(arcsOn)
+  }
+  return { group, floors, walls, panes, arcs, showArcs, items: itemGroups, applyFade, applyHidden }
 }

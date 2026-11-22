@@ -3,17 +3,20 @@
 // rotate and edit, products added from a link, rooms you select to rename, change the height of or delete, and doors and windows
 // placed, dragged and edited in the top view. Rooms of any shape are drawn corner by corner in the top view, and a selected
 // room's corners are dragged to change its outline. While an item is dragged, the distances to the walls and the nearest item show;
-// the Measure tool measures between two points.
+// the Measure tool measures between two points. Double-click a room, or press Focus in its panel, to focus the camera on it;
+// the rooms list shows or hides each room, as a view setting that isn't saved.
 // On a phone it is view only: look, orbit, measure, switch the view, the version and the language, Export, and tap an item to see it.
 // Rooms, items and panels are added issue by issue (see docs/spec.md).
 import * as THREE from 'three'
 import { loadLanguage, t } from './i18n/index.ts'
 import { loadHome, saveHome } from './model/autosave.ts'
 import { dragDistances } from './model/distances.ts'
+import { frameRoom } from './model/focus.ts'
 import { currentVersion } from './model/home.ts'
-import { wallsOf, type Plan } from './model/plan.ts'
+import { wallsOf, type Plan, type Room } from './model/plan.ts'
 import { newSampleHome } from './model/sample.ts'
 import { createStore, type Store } from './model/store.ts'
+import type { HiddenRooms } from './model/visibility.ts'
 import { createCameraRig, type CameraRig } from './scene/camera.ts'
 import { buildHome, type HomeView } from './scene/home.ts'
 import { createCornerHandles } from './scene/corner-handles.ts'
@@ -33,6 +36,7 @@ import { applyLanguage, mountLanguageSwitcher } from './ui/language-switcher.ts'
 import { mountOpeningControls, type OpeningControls } from './ui/opening-controls.ts'
 import { mountOpeningPanel } from './ui/opening-panel.ts'
 import { mountRoomPanel } from './ui/room-panel.ts'
+import { mountRoomsList } from './ui/rooms-list.ts'
 import { mountTapeMeasure } from './ui/tape-measure.ts'
 import { mountUndoRedo } from './ui/undo-redo.ts'
 import { mountVersionBar } from './ui/version-bar.ts'
@@ -61,6 +65,10 @@ declare global {
       selectedOpeningId: () => string | null
       /** The id of the selected room, or `null`. */
       selectedRoomId: () => string | null
+      /** The ids of the hidden rooms (a view setting, not part of the home). */
+      hiddenRoomIds: () => string[]
+      /** The ids of the items drawn and not hidden. */
+      shownItemIds: () => string[]
       /** Where a point in the home shows on the page, in client pixels. */
       toScreen: (x: number, y: number, z: number) => { x: number; y: number }
     }
@@ -84,6 +92,8 @@ scene.add(sun)
 
 let home: HomeView = buildHome(store.get().plan, currentVersion(store.get()).items)
 scene.add(home.group)
+/** The rooms hidden from the rooms list: a view setting, never in the store. */
+let hiddenRooms: HiddenRooms = new Set()
 
 const draw = (plan: Plan) => {
   scene.remove(home.group)
@@ -94,6 +104,7 @@ const draw = (plan: Plan) => {
     }
   })
   home = buildHome(plan, currentVersion(store.get()).items)
+  home.applyHidden(hiddenRooms)
   scene.add(home.group)
   // Make the new home match the screen now, not at the next frame: a click before that frame
   // would otherwise hit solid, unfaded walls, or items whose world positions aren't computed yet.
@@ -108,6 +119,8 @@ store.subscribe((next) => draw(next.plan))
 
 const rig = createCameraRig(renderer.domElement, home.group)
 const { camera, controls } = rig
+/** Moves the camera smoothly to frame a room. */
+const focusRoom = (room: Room) => rig.focus(frameRoom(room, camera.fov, camera.aspect))
 
 const itemPanel = mountItemPanel(document.body, store, {
   duplicate: () => itemControls.duplicateSelected(),
@@ -182,7 +195,7 @@ const openingControls: OpeningControls = viewOnly
       },
     })
 const snapToggle = viewOnly ? null : mountSnapToggle(document.body)
-const roomPanel = viewOnly ? null : mountRoomPanel(document.body, store)
+const roomPanel = viewOnly ? null : mountRoomPanel(document.body, store, focusRoom)
 const itemControls: ItemControls = mountItemControls({
   surface: container,
   canvas: renderer.domElement,
@@ -203,6 +216,7 @@ const itemControls: ItemControls = mountItemControls({
     roomPanel?.show(room)
     cornerControls?.show(room)
   },
+  onFocusRoom: focusRoom,
   paused: () => tapeMeasure.active() || drawing(),
   onDrag: (item) => {
     if (!item) return measures.showDrag([])
@@ -220,6 +234,8 @@ window.drafthouse = {
   viewOnly,
   selectedOpeningId: openingControls.selectedId,
   selectedRoomId: itemControls.selectedRoomId,
+  hiddenRoomIds: () => [...hiddenRooms],
+  shownItemIds: () => home.items.filter((group) => group.visible).map((group) => group.name),
   toScreen: (x, y, z) => {
     const ndc = new THREE.Vector3(x, y, z).project(camera)
     const rect = renderer.domElement.getBoundingClientRect()
@@ -243,6 +259,28 @@ if (viewOnly) {
 } else {
   panels.push(mountAddRoom(document.body, store), mountUndoRedo(document.body, store), mountAddItem(document.body, store, rig.lookPoint))
 }
+// After the view-only note, so on a phone the list sits above it.
+const roomsList = mountRoomsList({
+  parent: document.body,
+  store,
+  onChange: (hidden) => {
+    hiddenRooms = hidden
+    home.applyHidden(hidden)
+    // What can't be seen can't stay selected.
+    const item = itemControls.selectedId()
+    if (item !== null && home.items.find((group) => group.name === item)?.visible === false) itemControls.clear()
+    const opening = openingControls.selectedId()
+    if (opening !== null && [...home.walls, ...home.panes].some((piece) => piece.opening === opening && !piece.mesh.visible)) openingControls.deselect()
+  },
+  // On a phone nothing is selected to edit: the name focuses the room instead.
+  onSelect: (id) => {
+    const room = store.get().plan.rooms.find((r) => r.id === id)
+    if (!room) return
+    if (viewOnly) focusRoom(room)
+    else itemControls.selectRoom(id)
+  },
+})
+panels.push(roomsList)
 for (const panel of panels) panel.render()
 mountLanguageSwitcher(document.body, () => {
   applyLanguage()
@@ -259,6 +297,7 @@ window.addEventListener('resize', resize)
 resize()
 
 renderer.setAnimationLoop(() => {
+  rig.update()
   controls.update()
   // Looking straight down, every room is already open to view: nothing fades.
   home.applyFade(rig.isTopView() ? null : camera.position)

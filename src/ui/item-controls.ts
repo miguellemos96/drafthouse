@@ -46,6 +46,8 @@ export type ItemControlsOptions = {
   onSelectRoom?: (room: Room | null) => void
   /** Called with the item where it is now on each step of a drag, and with null when the drag ends. */
   onDrag?: (item: Item | null) => void
+  /** Called with the room whose floor is double-clicked, to focus the camera on it. */
+  onFocusRoom?: (room: Room) => void
   /** While this returns true, the pointer neither selects nor moves items (another tool has it). */
   paused?: () => boolean
   mac?: boolean
@@ -57,6 +59,8 @@ export type ItemControls = {
   selectedRoomId: () => string | null
   /** Clears the selection, item or room. */
   clear: () => void
+  /** Selects a room, which clears any selected item. */
+  selectRoom: (id: string | null) => void
   /** Call after the home view is rebuilt, so the highlight lands on the new meshes. */
   refresh: () => void
   /** Copies the selected item 20 cm to the right and towards the camera, and selects the copy. */
@@ -84,6 +88,7 @@ export const mountItemControls = ({
   guides,
   onSelect,
   onSelectRoom,
+  onFocusRoom,
   onDrag,
   paused = () => false,
   viewOnly = false,
@@ -98,7 +103,7 @@ export const mountItemControls = ({
   const findItem = (id: string | null) => items().find((item) => item.id === id) ?? null
   const groupOf = (id: string) => view().items.find((group) => group.name === id)
 
-  const aim = (event: PointerEvent) => {
+  const aim = (event: MouseEvent) => {
     const rect = canvas.getBoundingClientRect()
     const ndc = new THREE.Vector2(((event.clientX - rect.left) / rect.width) * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1)
     raycaster.setFromCamera(ndc, camera)
@@ -112,8 +117,8 @@ export const mountItemControls = ({
   /** The item under the pointer, unless a solid wall stands in front of it. Faded walls let clicks through. */
   const pickItem = (): string | null => {
     const home = view()
-    const solidWalls = home.walls.filter(({ mesh }) => mesh.material.opacity === 1).map(({ mesh }) => mesh)
-    const [hit] = raycaster.intersectObjects([...home.items, ...solidWalls], true)
+    const solidWalls = home.walls.filter(({ mesh }) => mesh.visible && mesh.material.opacity === 1).map(({ mesh }) => mesh)
+    const [hit] = raycaster.intersectObjects([...home.items.filter((group) => group.visible), ...solidWalls], true)
     for (let object: THREE.Object3D | null = hit?.object ?? null; object; object = object.parent) {
       if (home.items.includes(object as THREE.Group)) return object.name
     }
@@ -123,8 +128,8 @@ export const mountItemControls = ({
   /** The room whose floor is under the pointer, unless a solid wall stands in front of it. */
   const pickRoom = (): string | null => {
     const home = view()
-    const solidWalls = home.walls.filter(({ mesh }) => mesh.material.opacity === 1).map(({ mesh }) => mesh)
-    const [hit] = raycaster.intersectObjects([...home.floors, ...solidWalls], false)
+    const solidWalls = home.walls.filter(({ mesh }) => mesh.visible && mesh.material.opacity === 1).map(({ mesh }) => mesh)
+    const [hit] = raycaster.intersectObjects([...home.floors.filter((floor) => floor.visible), ...solidWalls], false)
     return hit && home.floors.includes(hit.object as THREE.Mesh) ? hit.object.name : null
   }
 
@@ -291,7 +296,16 @@ export const mountItemControls = ({
     store.set(updateItem(store.get(), item.id, { rotation: snap() ? snapStepRotation(item.rotation, steps) : stepRotation(item.rotation, steps) }))
   }
 
+  /** A double click on a room's floor focuses the camera on that room, in every mode. */
+  const onDoubleClick = (event: MouseEvent) => {
+    if (paused() || !onFocusRoom) return
+    aim(event)
+    const room = findRoom(pickRoom())
+    if (room) onFocusRoom(room)
+  }
+
   // Capture on the surface: these run before the orbit controls' own listeners on the canvas.
+  surface.addEventListener('dblclick', onDoubleClick)
   surface.addEventListener('pointerdown', onPointerDown, { capture: true })
   window.addEventListener('pointermove', onPointerMove)
   window.addEventListener('pointerup', onPointerUp)
@@ -314,5 +328,5 @@ export const mountItemControls = ({
     if (selected !== null || selectedRoom !== null) select(null)
   }
 
-  return { selectedId: () => selected, selectedRoomId: () => selectedRoom, clear: () => select(null), refresh, duplicateSelected, deleteSelected, deselect }
+  return { selectedId: () => selected, selectedRoomId: () => selectedRoom, clear: () => select(null), selectRoom, refresh, duplicateSelected, deleteSelected, deselect }
 }

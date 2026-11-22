@@ -111,6 +111,17 @@
       #room-panel-message, #room-panel-confirm { margin: 0; padding: 6px 8px; background: #fff3cd; border: 1px solid #e0c36c; border-radius: 4px; }
       #room-panel-confirm p { margin: 0 0 6px; }
       #room-panel .buttons { display: flex; gap: 8px; }
+      #rooms-list { position: fixed; left: 50%; bottom: 12px; transform: translateX(-50%); z-index: 1; width: 240px; max-width: calc(100vw - 24px); max-height: calc(100vh - 200px); overflow-y: auto; box-sizing: border-box; padding: 6px 10px; background: rgba(255, 255, 255, 0.92); border: 1px solid #ccc; border-radius: 6px; }
+      #view-only-note ~ #rooms-list { bottom: 64px; }
+      #rooms-list summary { cursor: pointer; font-weight: 600; }
+      #rooms-list ul { list-style: none; margin: 6px 0; padding: 0; display: grid; gap: 4px; }
+      #rooms-list li { display: flex; align-items: center; gap: 6px; }
+      #rooms-list li.hidden-room .name { opacity: 0.55; }
+      #rooms-list button { font: inherit; padding: 2px 8px; }
+      #rooms-list .eye { width: 36px; }
+      #rooms-list .name { flex: 1; min-width: 0; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      #rooms-list .empty { margin: 6px 0; }
+      #rooms-list [hidden] { display: none; }
     </style>
   </head>
   <body>
