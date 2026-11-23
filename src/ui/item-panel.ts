@@ -4,16 +4,23 @@
 // Each finished edit (on change or Enter, not on every keystroke) is one change through the store,
 // so it's autosaved and one undo step. A size out of 1–1000 cm shows a message and isn't saved.
 // In view-only mode (phones) it shows only the name, the photo and the link.
+// In both modes it lists what the item clashes with ("Overlaps Sofa", "Blocks the door"); see src/model/clashes.ts.
 import { t } from '../i18n/index.ts'
 import { isValidSize, resizeItem } from '../model/editItem.ts'
 import { updateItem } from '../model/home.ts'
+import type { ItemClash } from '../model/clashes.ts'
 import type { Item } from '../model/item.ts'
 import { safeHttpUrl } from '../model/linkProduct.ts'
 import { ITEM_SIZE_LIMITS, SIZE_FIELDS, type SizeField } from '../model/newItem.ts'
 import type { Store } from '../model/store.ts'
 import { isMacPlatform } from './shortcuts.ts'
 
-export type ItemPanel = { show: (item: Item | null) => void; render: () => void }
+export type ItemPanel = {
+  show: (item: Item | null) => void
+  /** Lists what the shown item clashes with; an empty list hides the list. */
+  showClashes: (clashes: ItemClash[]) => void
+  render: () => void
+}
 
 export type ItemPanelActions = { duplicate: () => void; remove: () => void }
 
@@ -90,6 +97,33 @@ export function mountItemPanel(
 
   let shownPhoto: string | undefined
 
+  const clashList = document.createElement('ul')
+  clashList.id = 'item-clashes'
+  clashList.setAttribute('role', 'status')
+  clashList.hidden = true
+  let clashes: ItemClash[] = []
+
+  const clashText = (clash: ItemClash) =>
+    clash.kind === 'item' ? t('item.panel.clash.item', { name: clash.name }) : t(clash.kind === 'wall' ? 'item.panel.clash.wall' : 'item.panel.clash.door')
+
+  const renderClashes = () => {
+    // Going through two walls reads once.
+    const lines = [...new Set(clashes.map(clashText))]
+    clashList.hidden = lines.length === 0
+    clashList.replaceChildren(
+      ...lines.map((line) => {
+        const li = document.createElement('li')
+        li.textContent = line
+        return li
+      }),
+    )
+  }
+
+  const showClashes = (next: ItemClash[]) => {
+    clashes = next
+    renderClashes()
+  }
+
   const save = (changes: Partial<Omit<Item, 'id'>>) => {
     if (current) store.set(updateItem(store.get(), current.id, changes))
   }
@@ -142,6 +176,8 @@ export function mountItemPanel(
     remove.title = t('item.panel.delete.title')
     photo.alt = t('item.panel.photo')
     link.textContent = t('item.panel.link')
+    clashList.setAttribute('aria-label', t('item.panel.clashes'))
+    renderClashes()
     if (!message.hidden) showSizeError()
   }
 
@@ -172,8 +208,8 @@ export function mountItemPanel(
   }
 
   render()
-  if (viewOnly) panel.append(title, photo, link)
-  else panel.append(name.label, sizes.width.label, sizes.depth.label, sizes.height.label, colour.label, message, photo, link, buttons)
+  if (viewOnly) panel.append(title, clashList, photo, link)
+  else panel.append(name.label, sizes.width.label, sizes.depth.label, sizes.height.label, colour.label, message, clashList, photo, link, buttons)
   parent.appendChild(panel)
-  return { show, render }
+  return { show, showClashes, render }
 }

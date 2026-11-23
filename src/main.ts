@@ -4,15 +4,18 @@
 // placed, dragged and edited in the top view. Rooms of any shape are drawn corner by corner in the top view, and a selected
 // room's corners are dragged to change its outline. While an item is dragged, the distances to the walls and the nearest item show;
 // the Measure tool measures between two points. Double-click a room, or press Focus in its panel, to focus the camera on it;
-// the rooms list shows or hides each room, as a view setting that isn't saved.
+// the rooms list shows or hides each room, as a view setting that isn't saved. Clashing items and blocked doors turn red,
+// live while dragging, and the item panel says what the selected item clashes with.
 // On a phone it is view only: look, orbit, measure, switch the view, the version and the language, Export, and tap an item to see it.
 // Rooms, items and panels are added issue by issue (see docs/spec.md).
 import * as THREE from 'three'
 import { loadLanguage, t } from './i18n/index.ts'
 import { loadHome, saveHome } from './model/autosave.ts'
+import { blockedDoorIds, clashesOf, clashingItemIds, findClashes, type Clash } from './model/clashes.ts'
 import { dragDistances } from './model/distances.ts'
 import { frameRoom } from './model/focus.ts'
 import { currentVersion } from './model/home.ts'
+import type { Item } from './model/item.ts'
 import { wallsOf, type Plan, type Room } from './model/plan.ts'
 import { newSampleHome } from './model/sample.ts'
 import { createStore, type Store } from './model/store.ts'
@@ -69,6 +72,8 @@ declare global {
       hiddenRoomIds: () => string[]
       /** The ids of the items drawn and not hidden. */
       shownItemIds: () => string[]
+      /** The ids of the items drawn red for a clash, and of the doors drawn red as blocked. */
+      clashing: () => { items: string[]; doors: string[] }
       /** Where a point in the home shows on the page, in client pixels. */
       toScreen: (x: number, y: number, z: number) => { x: number; y: number }
     }
@@ -95,6 +100,18 @@ scene.add(home.group)
 /** The rooms hidden from the rooms list: a view setting, never in the store. */
 let hiddenRooms: HiddenRooms = new Set()
 
+/** The clashes among the items as last drawn or previewed: a warning only, never saved. */
+let clashes: Clash[] = []
+let clashItems: Item[] = []
+/** Works out the clashes among `items` in `plan`, tints the scene and updates the item panel. */
+const showClashes = (plan: Plan, items: Item[]) => {
+  clashes = findClashes(plan, items)
+  clashItems = items
+  home.showClashes(clashingItemIds(clashes), blockedDoorIds(clashes))
+  const selected = itemControls.selectedId()
+  itemPanel.showClashes(selected === null ? [] : clashesOf(clashes, items, selected))
+}
+
 const draw = (plan: Plan) => {
   scene.remove(home.group)
   home.group.traverse((object) => {
@@ -111,6 +128,7 @@ const draw = (plan: Plan) => {
   home.applyFade(rig.isTopView() ? null : camera.position)
   home.group.updateMatrixWorld(true)
   itemControls.refresh()
+  showClashes(plan, currentVersion(store.get()).items)
   openingControls.refresh()
 }
 
@@ -210,6 +228,7 @@ const itemControls: ItemControls = mountItemControls({
   onSelect: (item) => {
     if (item) openingControls.deselect()
     itemPanel.show(item)
+    itemPanel.showClashes(item ? clashesOf(clashes, clashItems, item.id) : [])
   },
   onSelectRoom: (room) => {
     if (room) openingControls.deselect()
@@ -218,6 +237,8 @@ const itemControls: ItemControls = mountItemControls({
   },
   onFocusRoom: focusRoom,
   paused: () => tapeMeasure.active() || drawing(),
+  // A move or turn in progress: the clashes follow the item before it reaches the store.
+  onPreview: (item) => showClashes(store.get().plan, currentVersion(store.get()).items.map((other) => (other.id === item.id ? item : other))),
   onDrag: (item) => {
     if (!item) return measures.showDrag([])
     const home = store.get()
@@ -236,12 +257,16 @@ window.drafthouse = {
   selectedRoomId: itemControls.selectedRoomId,
   hiddenRoomIds: () => [...hiddenRooms],
   shownItemIds: () => home.items.filter((group) => group.visible).map((group) => group.name),
+  clashing: () => ({ items: [...clashingItemIds(clashes)], doors: [...blockedDoorIds(clashes)] }),
   toScreen: (x, y, z) => {
     const ndc = new THREE.Vector3(x, y, z).project(camera)
     const rect = renderer.domElement.getBoundingClientRect()
     return { x: rect.left + ((ndc.x + 1) / 2) * rect.width, y: rect.top + ((1 - ndc.y) / 2) * rect.height }
   },
 }
+
+// The home as it opens may already have clashes.
+showClashes(store.get().plan, currentVersion(store.get()).items)
 
 const toggle = mountViewToggle(document.body, rig.isTopView, setTopView)
 const fileButtons = mountFileButtons(document.body, store, { canImport: !viewOnly })
