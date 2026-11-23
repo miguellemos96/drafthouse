@@ -13,6 +13,9 @@ const chromium = {
 export default defineConfig({
   outputDir: 'test-results',
   forbidOnly: !!process.env.CI,
+  // Each browser draws the 3D view in software, so one per core fills the CPU. Locally, at most 4
+  // at once until the view stops redrawing when nothing changes (#71). CI keeps Playwright's default.
+  workers: process.env.CI ? undefined : 4,
   reporter: 'list',
   use: { baseURL: `http://localhost:${port}` },
   projects: [
