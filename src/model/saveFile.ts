@@ -2,6 +2,7 @@
 // See "Saving" in docs/spec.md. Doors and windows (`plan.openings`) came without a format bump: a file
 // without them is a home with no openings, so there is nothing to migrate.
 import { FORMAT_VERSION, type Home } from './home.ts'
+import { FLOOR_MATERIALS, type FloorMaterial } from './finishes.ts'
 import type { Mount } from './item.ts'
 import { createRoom } from './plan.ts'
 
@@ -105,8 +106,25 @@ const isItem = (item: unknown) =>
   MOUNTS.includes(item.mount as Mount) &&
   (item.product === undefined || isProduct(item.product))
 
+const isStringRecord = (value: unknown) => isObject(value) && Object.values(value).every(isString)
+
+const isRoomFinish = (finish: unknown) =>
+  isObject(finish) &&
+  (finish.floor === undefined || FLOOR_MATERIALS.includes(finish.floor as FloorMaterial)) &&
+  optional(finish.floorColour, isString) &&
+  (finish.walls === undefined || isStringRecord(finish.walls))
+
+// Finishes came without a format bump: every finish is optional and falls back to a default.
+const isFinishes = (finishes: unknown) =>
+  isObject(finishes) && (finishes.rooms === undefined || (isObject(finishes.rooms) && Object.values(finishes.rooms).every(isRoomFinish)))
+
 const isVersion = (version: unknown) =>
-  isObject(version) && isString(version.id) && isString(version.name) && Array.isArray(version.items) && version.items.every(isItem)
+  isObject(version) &&
+  isString(version.id) &&
+  isString(version.name) &&
+  Array.isArray(version.items) &&
+  version.items.every(isItem) &&
+  (version.finishes === undefined || isFinishes(version.finishes))
 
 function isHome(data: Data): data is Home {
   if (data.formatVersion !== FORMAT_VERSION || !optional(data.name, isString)) return false

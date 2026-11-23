@@ -1,15 +1,22 @@
-// The panel for the selected room: its name, wall height and area, a Focus button, and a Delete room button that
-// asks first, in the app, how many items go with it. Each finished edit is one change through the
+// The panel for the selected room: its name, wall height and area, its finishes (floor material and colour, and a
+// colour per wall, in the current version), a Focus button, and a Delete room button that asks first, in the app,
+// how many items go with it. The walls fold open; hovering a wall's row highlights that wall in the view. Each finished edit is one change through the
 // store. The rules are in src/model/room.ts. See "Rooms" in docs/spec.md.
 import { getLanguage, t } from '../i18n/index.ts'
-import { setPlan } from '../model/home.ts'
-import { roomArea, type Room } from '../model/plan.ts'
+import { FLOOR_MATERIALS, floorOf, roomWalls, setFloor, setWallColour, wallColourOf, type FloorMaterial } from '../model/finishes.ts'
+import { currentVersion, setPlan } from '../model/home.ts'
+import { roomArea, type Point, type Room } from '../model/plan.ts'
 import { itemsGoingWith, removeRoom, ROOM_HEIGHT_LIMITS, roomHeightError, updateRoom } from '../model/room.ts'
 import type { Store } from '../model/store.ts'
 
 export type RoomPanel = { show: (room: Room | null) => void; render: () => void }
 
-export function mountRoomPanel(parent: HTMLElement, store: Store, focus: (room: Room) => void = () => {}): RoomPanel {
+export function mountRoomPanel(
+  parent: HTMLElement,
+  store: Store,
+  focus: (room: Room) => void = () => {},
+  highlightWall: (wall: { a: Point; b: Point } | null) => void = () => {},
+): RoomPanel {
   const panel = document.createElement('aside')
   panel.id = 'room-panel'
   panel.hidden = true
@@ -31,6 +38,31 @@ export function mountRoomPanel(parent: HTMLElement, store: Store, focus: (room: 
   height.input.min = String(ROOM_HEIGHT_LIMITS.min)
   height.input.max = String(ROOM_HEIGHT_LIMITS.max)
   height.input.step = '1'
+
+  const floorLabel = document.createElement('label')
+  const floorText = document.createElement('span')
+  const floorMaterial = document.createElement('select')
+  floorMaterial.id = 'room-panel-floor'
+  floorMaterial.name = floorMaterial.id
+  const materialOptions = FLOOR_MATERIALS.map((m) => {
+    const option = document.createElement('option')
+    option.value = m
+    return option
+  })
+  floorMaterial.append(...materialOptions)
+  floorLabel.append(floorText, floorMaterial)
+  const floorColour = field('room-panel-floor-colour', 'color')
+
+  // The walls fold away, closed at first, so the panel stays short and leaves the view free to work in.
+  const wallsSection = document.createElement('details')
+  wallsSection.id = 'room-panel-walls-section'
+  const wallsTitle = document.createElement('summary')
+  const wallList = document.createElement('ul')
+  wallList.id = 'room-panel-walls'
+  wallList.className = 'walls'
+  // One row per wall: its label and a colour input. Rebuilt when the room's outline changes.
+  let wallRows: { a: Point; b: Point; length: number; text: HTMLSpanElement; input: HTMLInputElement }[] = []
+  let wallsShape = ''
 
   const area = document.createElement('p')
   area.className = 'area'
@@ -79,6 +111,14 @@ export function mountRoomPanel(parent: HTMLElement, store: Store, focus: (room: 
     name.text.textContent = t('room.panel.name')
     height.text.textContent = t('room.panel.height')
     areaLabel.textContent = t('room.panel.area')
+    floorText.textContent = t('room.panel.floor')
+    materialOptions.forEach((option, i) => (option.textContent = t(`room.panel.floor.${FLOOR_MATERIALS[i]}`)))
+    floorColour.text.textContent = t('room.panel.floorColour')
+    wallsTitle.textContent = t('room.panel.walls')
+    wallRows.forEach((row, i) => {
+      row.text.textContent = t('room.panel.wall', { n: i + 1, length: Math.round(row.length) })
+      row.input.setAttribute('aria-label', row.text.textContent)
+    })
     focusButton.textContent = t('room.panel.focus')
     focusButton.title = t('room.panel.focus.title')
     remove.textContent = t('room.panel.delete')
@@ -107,8 +147,61 @@ export function mountRoomPanel(parent: HTMLElement, store: Store, focus: (room: 
     // A field being typed in keeps what the user typed until they finish.
     if (room && (changedRoom || document.activeElement !== name.input)) name.input.value = room.name
     if (room && (changedRoom || document.activeElement !== height.input)) height.input.value = String(room.height)
+    if (room) showFinishes(room)
+    else if (wallsShape !== '') {
+      wallsShape = ''
+      wallList.replaceChildren()
+      wallRows = []
+      highlightWall(null)
+    }
     render()
   }
+
+  const showFinishes = (room: Room) => {
+    const { finishes } = currentVersion(store.get())
+    const floor = floorOf(finishes, room.id)
+    floorMaterial.value = floor.material
+    floorColour.input.value = floor.colour
+    const walls = roomWalls(room)
+    const shape = `${room.id}:${JSON.stringify(room.corners)}`
+    if (shape !== wallsShape) {
+      wallsShape = shape
+      highlightWall(null)
+      const rows = walls.map((wall) => {
+        const row = document.createElement('li')
+        const label = document.createElement('label')
+        const text = document.createElement('span')
+        const input = document.createElement('input')
+        input.type = 'color'
+        label.append(text, input)
+        row.append(label)
+        row.addEventListener('pointerenter', () => highlightWall(wall))
+        row.addEventListener('pointerleave', () => highlightWall(null))
+        input.addEventListener('change', () => {
+          const home = store.get()
+          if (input.value !== wallColourOf(currentVersion(home).finishes, room.id, wall.a, wall.b)) store.set(setWallColour(home, room.id, wall.a, wall.b, input.value))
+        })
+        return { row, entry: { ...wall, text, input } }
+      })
+      wallList.replaceChildren(...rows.map((r) => r.row))
+      wallRows = rows.map((r) => r.entry)
+    }
+    for (const row of wallRows) row.input.value = wallColourOf(finishes, room.id, row.a, row.b)
+  }
+
+  floorMaterial.addEventListener('change', () => {
+    if (!room) return
+    const home = store.get()
+    const material = floorMaterial.value as FloorMaterial
+    if (material !== floorOf(currentVersion(home).finishes, room.id).material) store.set(setFloor(home, room.id, { material }))
+  })
+
+  floorColour.input.addEventListener('change', () => {
+    if (!room) return
+    const home = store.get()
+    const colour = floorColour.input.value
+    if (colour !== floorOf(currentVersion(home).finishes, room.id).colour) store.set(setFloor(home, room.id, { colour }))
+  })
 
   name.input.addEventListener('change', () => {
     if (!room) return
@@ -147,11 +240,12 @@ export function mountRoomPanel(parent: HTMLElement, store: Store, focus: (room: 
     store.set(removeRoom(store.get(), room.id))
   })
 
+  wallsSection.append(wallsTitle, wallList)
   render()
   const buttons = document.createElement('div')
   buttons.className = 'buttons'
   buttons.append(focusButton, remove)
-  panel.append(title, name.label, height.label, message, area, buttons, confirm)
+  panel.append(title, name.label, height.label, message, area, floorLabel, floorColour.label, wallsSection, buttons, confirm)
   parent.appendChild(panel)
   return { show, render }
 }
