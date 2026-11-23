@@ -135,9 +135,9 @@ describe('versions', () => {
 
   it('copies everything in the version, not only the items', () => {
     const home = newHome()
-    const withExtra = { ...home, versions: [{ ...home.versions[0], finishes: { floor: 'oak' } }] }
+    const withExtra = { ...home, versions: [{ ...home.versions[0], finishes: { rooms: { r: { floor: 'tile' as const } } } }] }
     const copy = currentVersion(duplicateVersion(withExtra, 'c')) as unknown as { finishes: unknown }
-    expect(copy.finishes).toEqual({ floor: 'oak' })
+    expect(copy.finishes).toEqual({ rooms: { r: { floor: 'tile' } } })
     expect(copy.finishes).not.toBe((withExtra.versions[0] as unknown as { finishes: unknown }).finishes)
   })
 

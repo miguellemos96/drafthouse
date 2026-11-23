@@ -1,12 +1,14 @@
 // The Home: the plan plus the versions of its items. See "Home" and "Version" in docs/spec.md.
 // Every helper returns a new Home and leaves the one it was given untouched.
 import { t } from '../i18n/index.ts'
+import type { Finishes } from './finishes.ts'
 import type { Item } from './item.ts'
 import type { Plan } from './plan.ts'
 
 export const FORMAT_VERSION = 1
 
-export type Version = { id: string; name: string; items: Item[] }
+/** `finishes` is missing in homes saved before finishes; read them with the helpers in finishes.ts. */
+export type Version = { id: string; name: string; items: Item[]; finishes?: Finishes }
 
 export type Home = {
   formatVersion: typeof FORMAT_VERSION
