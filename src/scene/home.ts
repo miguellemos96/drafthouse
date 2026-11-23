@@ -1,5 +1,6 @@
 // Draws a plan and its items: one floor per room in its material and colour, the walls as boxes around their doors and windows,
 // a pane per window, a swing arc per door, and one group per item. Plan (x, y) maps to scene (x, z); +Y is up.
+// Clashing items are tinted red, and a blocked door's arc is drawn red and shown in every view (see src/model/clashes.ts).
 // Each face of a wall takes the colour the room on that side gives it (see src/model/finishes.ts).
 import * as THREE from 'three'
 import { wallFades } from '../model/fade.ts'
@@ -9,13 +10,15 @@ import { openingsOf, spanOn, swingArc, wallOf, wallPieces, type WallPiece } from
 import { WALL_THICKNESS, wallLength, wallsOf, type Plan, type Point, type Wall } from '../model/plan.ts'
 import { itemVisible, wallVisible, type HiddenRooms } from '../model/visibility.ts'
 import { floorTexture } from './floor-textures.ts'
-import { buildItem } from './items.ts'
+import { buildItem, tintClash } from './items.ts'
 
 export { WALL_THICKNESS }
 const FADED_OPACITY = 0.15
 const PANE_THICKNESS = 2 // cm
 const ARC_LIFT = 1 // cm above the floor, so the arc doesn't flicker against it
 const ARC_STEPS = 16
+const ARC_COLOUR = 0x2f80ed
+const BLOCKED_ARC_COLOUR = 0xe0242a
 const HIGHLIGHT = 0x2f80ed
 
 export type HomeView = {
@@ -28,8 +31,10 @@ export type HomeView = {
   panes: { opening: string; mesh: THREE.Mesh<THREE.BoxGeometry, THREE.MeshStandardMaterial> }[]
   /** Each door's swing: a flat quarter circle on the floor, shown in the top view only. */
   arcs: { opening: string; object: THREE.Group }[]
-  /** Shows or hides the doors' swing arcs. */
+  /** Shows or hides the doors' swing arcs. A blocked door's arc shows either way. */
   showArcs: (on: boolean) => void
+  /** Tints the clashing items red and draws the blocked doors' arcs red; everything else goes back to normal. */
+  showClashes: (items: ReadonlySet<string>, doors: ReadonlySet<string>) => void
   /** One group per item, in the order given. */
   items: THREE.Group[]
   /** Fades the walls the model says stand between this camera and the rooms; `null` fades none. */
@@ -88,10 +93,10 @@ const arcObject = ({ centre, radius, startAngle, endAngle }: NonNullable<ReturnT
   const outline = [new THREE.Vector2(centre.x, centre.y), ...points]
   const fill = new THREE.ShapeGeometry(new THREE.Shape(outline))
   fill.rotateX(Math.PI / 2) // shape (x, y, 0) → scene (x, 0, y)
-  const sector = new THREE.Mesh(fill, new THREE.MeshBasicMaterial({ color: 0x2f80ed, transparent: true, opacity: 0.18, side: THREE.DoubleSide, depthWrite: false }))
+  const sector = new THREE.Mesh(fill, new THREE.MeshBasicMaterial({ color: ARC_COLOUR, transparent: true, opacity: 0.18, side: THREE.DoubleSide, depthWrite: false }))
   const line = new THREE.LineLoop(
     new THREE.BufferGeometry().setFromPoints(outline.map((p) => new THREE.Vector3(p.x, 0, p.y))),
-    new THREE.LineBasicMaterial({ color: 0x2f80ed }),
+    new THREE.LineBasicMaterial({ color: ARC_COLOUR }),
   )
   const group = new THREE.Group()
   group.add(sector, line)
@@ -143,6 +148,7 @@ export const buildHome = (plan: Plan, items: Item[] = [], finishes?: Finishes): 
     }
   }
   let arcsOn = false
+  let blockedDoors: ReadonlySet<string> = new Set()
   let hiddenRooms: HiddenRooms = new Set()
   const openingShown = (id: string) => {
     const wall = wallOfOpening.get(id)
@@ -150,7 +156,18 @@ export const buildHome = (plan: Plan, items: Item[] = [], finishes?: Finishes): 
   }
   const showArcs = (on: boolean) => {
     arcsOn = on
-    for (const { opening, object } of arcs) object.visible = on && openingShown(opening)
+    for (const { opening, object } of arcs) object.visible = (on || blockedDoors.has(opening)) && openingShown(opening)
+  }
+  const showClashes = (clashing: ReadonlySet<string>, doors: ReadonlySet<string>) => {
+    for (const group of itemGroups) tintClash(group, clashing.has(group.name))
+    blockedDoors = doors
+    for (const { opening, object } of arcs) {
+      const colour = doors.has(opening) ? BLOCKED_ARC_COLOUR : ARC_COLOUR
+      object.traverse((part) => {
+        if (part instanceof THREE.Mesh || part instanceof THREE.Line) (part.material as THREE.MeshBasicMaterial).color.setHex(colour)
+      })
+    }
+    showArcs(arcsOn)
   }
   const applyHidden = (hidden: HiddenRooms) => {
     hiddenRooms = hidden
@@ -164,5 +181,5 @@ export const buildHome = (plan: Plan, items: Item[] = [], finishes?: Finishes): 
     const key = target && wallKey(target.a, target.b)
     for (const { wall, mesh } of walls) mesh.material.emissive.setHex(key !== null && wallKey(wall.a, wall.b) === key ? HIGHLIGHT : 0x000000)
   }
-  return { group, floors, walls, panes, arcs, showArcs, items: itemGroups, applyFade, applyHidden, highlightWall }
+  return { group, floors, walls, panes, arcs, showArcs, showClashes, items: itemGroups, applyFade, applyHidden, highlightWall }
 }

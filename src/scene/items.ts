@@ -5,6 +5,9 @@ import { itemPlacement, partsOf, shadeColour } from '../model/placement.ts'
 import type { Part } from '../model/templates.ts'
 
 const CYLINDER_SEGMENTS = 24
+/** A clashing item's parts are mixed this far toward red, so their own colour still shows. */
+const CLASH_RED = 0xe0242a
+const CLASH_MIX = 0.55
 
 export type ItemMesh = THREE.Mesh<THREE.BoxGeometry | THREE.CylinderGeometry, THREE.MeshStandardMaterial>
 
@@ -25,6 +28,7 @@ const partGeometry = ({ shape, size, axis }: Part) => {
 const partMesh = (item: Item, part: Part): ItemMesh => {
   const material = new THREE.MeshStandardMaterial({ color: shadeColour(item.colour, part.shade) })
   const mesh = new THREE.Mesh(partGeometry(part), material)
+  mesh.userData.colour = material.color.getHex()
   mesh.position.set(part.center.x, part.center.y, part.center.z)
   return mesh
 }
@@ -38,4 +42,14 @@ export const buildItem = (item: Item): THREE.Group => {
   group.rotation.y = angle
   group.add(...partsOf(item).map((part) => partMesh(item, part)))
   return group
+}
+
+/** Tints an item's parts red to mark a clash, keeping some of their own colour, or clears the tint. */
+export const tintClash = (group: THREE.Object3D, on: boolean) => {
+  group.traverse((object) => {
+    if (object instanceof THREE.Mesh && object.material instanceof THREE.MeshStandardMaterial && typeof object.userData.colour === 'number') {
+      object.material.color.setHex(object.userData.colour)
+      if (on) object.material.color.lerp(new THREE.Color(CLASH_RED), CLASH_MIX)
+    }
+  })
 }

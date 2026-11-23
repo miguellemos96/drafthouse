@@ -147,6 +147,58 @@ describe('hiding rooms', () => {
   })
 })
 
+describe('clash warnings', () => {
+  const withDoor = (): Plan => {
+    const plan = sampleHome()
+    const shared = wallsOf(plan).find((w) => w.rooms.length === 2)!
+    return addOpening(plan, newOpening(plan, 'door', shared, 150, 'door')!)!
+  }
+  const colours = (group: THREE.Object3D) => {
+    const found: number[] = []
+    group.traverse((o) => {
+      if (o instanceof THREE.Mesh) found.push((o.material as THREE.MeshStandardMaterial).color.getHex())
+    })
+    return found
+  }
+  const arcColour = (home: ReturnType<typeof buildHome>) => {
+    let colour = 0
+    home.arcs[0].object.traverse((o) => {
+      if (o instanceof THREE.Mesh) colour = (o.material as THREE.MeshBasicMaterial).color.getHex()
+    })
+    return colour
+  }
+
+  it('tints clashing items red, keeping some of their own colour, and clears the tint again', () => {
+    const items = currentVersion(newSampleHome()).items
+    const home = buildHome(withDoor(), items)
+    const sofa = home.items.find((g) => g.name === 'sample-sofa')!
+    const before = colours(sofa)
+    home.showClashes(new Set(['sample-sofa']), new Set())
+    const tinted = colours(sofa)
+    tinted.forEach((hex, i) => {
+      expect(hex).not.toBe(before[i])
+      expect(hex).not.toBe(0xe0242a) // mixed, not plain red
+      expect(new THREE.Color(hex).r).toBeGreaterThan(new THREE.Color(before[i]).r)
+    })
+    expect(colours(home.items.find((g) => g.name === 'sample-table')!)).toEqual(colours(buildHome(withDoor(), items).items[1]))
+    home.showClashes(new Set(), new Set())
+    expect(colours(sofa)).toEqual(before)
+  })
+
+  it("draws a blocked door's arc red and shows it outside the top view too", () => {
+    const home = buildHome(withDoor())
+    const normal = arcColour(home)
+    home.showClashes(new Set(), new Set(['door']))
+    expect(arcColour(home)).toBe(0xe0242a)
+    expect(home.arcs[0].object.visible).toBe(true)
+    home.showArcs(false)
+    expect(home.arcs[0].object.visible).toBe(true)
+    home.showClashes(new Set(), new Set())
+    expect(arcColour(home)).toBe(normal)
+    expect(home.arcs[0].object.visible).toBe(false)
+  })
+})
+
 describe('buildHome finishes', () => {
   const faceColour = (mesh: THREE.Mesh, face: number) => {
     const colours = mesh.geometry.attributes.color

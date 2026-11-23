@@ -3,6 +3,7 @@
 // store once, when it ends, so autosave and undo see one change per move.
 // Duplicate (Ctrl+D or ⌘D) and Delete (Delete or Backspace) act on the selected item, each as one change.
 // While an item is dragged, `onDrag` follows it, so the distances to the walls and the nearest item can show.
+// `onPreview` follows every live step of a move or turn, so clash warnings can update before the store does.
 import * as THREE from 'three'
 import { duplicateItem } from '../model/editItem.ts'
 import { addItem, currentVersion, removeItem, updateItem } from '../model/home.ts'
@@ -46,6 +47,8 @@ export type ItemControlsOptions = {
   onSelectRoom?: (room: Room | null) => void
   /** Called with the item where it is now on each step of a drag, and with null when the drag ends. */
   onDrag?: (item: Item | null) => void
+  /** Called with the item where it shows on each live step of a move or turn, and where it went back to after a cancel. */
+  onPreview?: (item: Item) => void
   /** Called with the room whose floor is double-clicked, to focus the camera on it. */
   onFocusRoom?: (room: Room) => void
   /** While this returns true, the pointer neither selects nor moves items (another tool has it). */
@@ -90,6 +93,7 @@ export const mountItemControls = ({
   onSelectRoom,
   onFocusRoom,
   onDrag,
+  onPreview,
   paused = () => false,
   viewOnly = false,
   mac = isMacPlatform(navigator.platform),
@@ -166,6 +170,7 @@ export const mountItemControls = ({
       group.rotation.y = angle
     }
     selection.show(item)
+    onPreview?.(item)
   }
 
   const onPointerDown = (event: PointerEvent) => {
