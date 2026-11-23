@@ -1,10 +1,13 @@
 // The version bar: a selector of the home's versions, and Duplicate, Rename and Delete for the
 // current one. Each action is one store change, so it is autosaved and undone in one step.
 // Rename opens a name field in the bar; Delete asks for confirmation in the bar first.
-// With `canEdit: false` (phones, view only) the bar is just the selector.
+// Below the selector it shows the current version's price total per currency, the difference from
+// the first version, and how many items have no price.
+// With `canEdit: false` (phones, view only) the bar is just the selector and the prices.
 // See "Versions and prices" in docs/spec.md; the rules are in src/model/home.ts.
-import { t } from '../i18n/index.ts'
-import { canDeleteVersion, currentVersion, deleteVersion, duplicateVersion, renameVersion, switchVersion } from '../model/home.ts'
+import { formatMoney, t } from '../i18n/index.ts'
+import { canDeleteVersion, currentVersion, deleteVersion, duplicateVersion, renameVersion, switchVersion, type Home } from '../model/home.ts'
+import { priceDifference, priceTotals, unpricedCount, type Amount } from '../model/prices.ts'
 import type { Store } from '../model/store.ts'
 
 export type VersionBar = { render: () => void }
@@ -106,6 +109,34 @@ export function mountVersionBar(parent: HTMLElement, store: Store, { canEdit = t
   confirmButtons.append(confirmYes, confirmNo)
   confirm.append(question, confirmButtons)
 
+  // Prices: the total, the difference from the first version, and the count of items without a price.
+  const prices = document.createElement('div')
+  prices.id = 'version-prices'
+  prices.setAttribute('aria-live', 'polite')
+  const total = document.createElement('p')
+  total.id = 'version-total'
+  const difference = document.createElement('p')
+  difference.id = 'version-difference'
+  const unpriced = document.createElement('p')
+  unpriced.id = 'version-unpriced'
+  prices.append(total, difference, unpriced)
+  const amounts = (list: Amount[], separator: string, signed: boolean) =>
+    list.map((a) => formatMoney(a.cents, a.currency, { signed })).join(separator)
+  const renderPrices = (home: Home) => {
+    const current = currentVersion(home)
+    const totals = priceTotals(current.items)
+    total.textContent = totals.length > 0 ? t('price.total', { amounts: amounts(totals, ' + ', false) }) : ''
+    total.hidden = totals.length === 0
+    const first = home.versions[0]
+    const diff = first.id === current.id ? [] : priceDifference(totals, priceTotals(first.items))
+    difference.textContent = diff.length > 0 ? t('price.difference', { amounts: amounts(diff, ', ', true), name: first.name }) : ''
+    difference.hidden = diff.length === 0
+    const count = unpricedCount(current.items)
+    unpriced.textContent = count === 1 ? t('price.unpriced.one') : t('price.unpriced.many', { n: count })
+    unpriced.hidden = count === 0
+    prices.hidden = totals.length === 0 && diff.length === 0 && count === 0
+  }
+
   let mode: Mode = 'idle'
   const close = () => {
     mode = 'idle'
@@ -149,6 +180,7 @@ export function mountVersionBar(parent: HTMLElement, store: Store, { canEdit = t
     confirm.hidden = mode !== 'confirming'
     actions.hidden = mode !== 'idle'
     select.disabled = mode !== 'idle'
+    renderPrices(home)
   }
 
   // Any change to the home (an undo, say) closes an open rename or confirmation, so it never acts on a stale version.
@@ -157,7 +189,7 @@ export function mountVersionBar(parent: HTMLElement, store: Store, { canEdit = t
     render()
   })
   render()
-  bar.append(selectRow, ...(canEdit ? [actions, renameForm, confirm] : []))
+  bar.append(selectRow, prices, ...(canEdit ? [actions, renameForm, confirm] : []))
   parent.appendChild(bar)
   return { render }
 }
