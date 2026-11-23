@@ -5,6 +5,7 @@ import { wallsOf, type Plan } from '../model/plan.ts'
 import { currentVersion } from '../model/home.ts'
 import { newSampleHome, sampleHome } from '../model/sample.ts'
 import { buildHome, WALL_THICKNESS } from './home.ts'
+import { DEFAULT_FLOOR_COLOUR, DEFAULT_WALL_COLOUR, setFloor, setWallColour } from '../model/finishes.ts'
 
 const box = (object: THREE.Object3D) => new THREE.Box3().setFromObject(object)
 
@@ -195,5 +196,43 @@ describe('clash warnings', () => {
     home.showClashes(new Set(), new Set())
     expect(arcColour(home)).toBe(normal)
     expect(home.arcs[0].object.visible).toBe(false)
+  })
+})
+
+describe('buildHome finishes', () => {
+  const faceColour = (mesh: THREE.Mesh, face: number) => {
+    const colours = mesh.geometry.attributes.color
+    return new THREE.Color(colours.getX(face * 4), colours.getY(face * 4), colours.getZ(face * 4)).getHexString()
+  }
+  /** The colour of the face of `mesh` that looks towards the plan point (x, y). */
+  const colourFacing = (mesh: THREE.Mesh, x: number, y: number) => {
+    const plusZ = new THREE.Vector3(0, 0, 1).applyQuaternion(mesh.quaternion)
+    const towards = new THREE.Vector3(x - mesh.position.x, 0, y - mesh.position.z)
+    return faceColour(mesh, plusZ.dot(towards) > 0 ? 4 : 5)
+  }
+
+  it('draws a new room with a wood floor in light oak and off-white walls', () => {
+    const home = buildHome(sampleHome(), [], undefined)
+    expect((home.floors[0].material as THREE.MeshStandardMaterial).color.getHexString()).toBe(new THREE.Color(DEFAULT_FLOOR_COLOUR).getHexString())
+    expect(home.walls.every(({ mesh }) => colourFacing(mesh, 200, 150) === new THREE.Color(DEFAULT_WALL_COLOUR).getHexString())).toBe(true)
+  })
+
+  it('paints each face of a shared wall in its own room’s colour, and colours the floor', () => {
+    let h = setWallColour(newSampleHome(), 'living', { x: 400, y: 0 }, { x: 400, y: 300 }, '#3366cc')
+    h = setFloor(h, 'bedroom', { material: 'tile', colour: '#888888' })
+    const home = buildHome(h.plan, [], currentVersion(h).finishes)
+    const shared = home.walls.find((w) => w.wall.rooms.length === 2)!.mesh
+    expect(colourFacing(shared, 200, 150)).toBe(new THREE.Color('#3366cc').getHexString())
+    expect(colourFacing(shared, 550, 150)).toBe(new THREE.Color(DEFAULT_WALL_COLOUR).getHexString())
+    expect((home.floors[1].material as THREE.MeshStandardMaterial).color.getHexString()).toBe(new THREE.Color('#888888').getHexString())
+  })
+
+  it('highlights every piece of one wall, and clears it', () => {
+    const home = buildHome(sampleHome())
+    home.highlightWall({ a: { x: 400, y: 300 }, b: { x: 400, y: 0 } })
+    const lit = home.walls.filter(({ mesh }) => mesh.material.emissive.getHex() !== 0)
+    expect(lit.map((w) => w.wall.rooms.length)).toEqual([2])
+    home.highlightWall(null)
+    expect(home.walls.every(({ mesh }) => mesh.material.emissive.getHex() === 0)).toBe(true)
   })
 })

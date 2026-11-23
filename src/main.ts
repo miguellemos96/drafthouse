@@ -1,6 +1,7 @@
 // Entry point: the saved home (or the sample home) in 3D, with orbit controls, a top view,
 // autosave, undo and redo, Export and Import, versions you switch, duplicate, rename and delete, items you select, move (free or snapped),
-// rotate and edit, products added from a link, rooms you select to rename, change the height of or delete, and doors and windows
+// rotate and edit, products added from a link, rooms you select to rename, change the height of, finish (floor material and
+// colour, a colour per wall) or delete, and doors and windows
 // placed, dragged and edited in the top view. Rooms of any shape are drawn corner by corner in the top view, and a selected
 // room's corners are dragged to change its outline. While an item is dragged, the distances to the walls and the nearest item show;
 // the Measure tool measures between two points. Double-click a room, or press Focus in its panel, to focus the camera on it;
@@ -16,7 +17,7 @@ import { dragDistances } from './model/distances.ts'
 import { frameRoom } from './model/focus.ts'
 import { currentVersion } from './model/home.ts'
 import type { Item } from './model/item.ts'
-import { wallsOf, type Plan, type Room } from './model/plan.ts'
+import { wallsOf, type Plan, type Point, type Room } from './model/plan.ts'
 import { newSampleHome } from './model/sample.ts'
 import { createStore, type Store } from './model/store.ts'
 import type { HiddenRooms } from './model/visibility.ts'
@@ -95,10 +96,16 @@ const sun = new THREE.DirectionalLight(0xffffff, 1.2)
 sun.position.set(-300, 800, 500)
 scene.add(sun)
 
-let home: HomeView = buildHome(store.get().plan, currentVersion(store.get()).items)
+let home: HomeView = buildHome(store.get().plan, currentVersion(store.get()).items, currentVersion(store.get()).finishes)
 scene.add(home.group)
 /** The rooms hidden from the rooms list: a view setting, never in the store. */
 let hiddenRooms: HiddenRooms = new Set()
+/** The wall whose row is hovered in the room panel: tinted in the view. */
+let highlightedWall: { a: Point; b: Point } | null = null
+const highlightWall = (wall: { a: Point; b: Point } | null) => {
+  highlightedWall = wall
+  home.highlightWall(wall)
+}
 
 /** The clashes among the items as last drawn or previewed: a warning only, never saved. */
 let clashes: Clash[] = []
@@ -120,7 +127,8 @@ const draw = (plan: Plan) => {
       object.material.dispose()
     }
   })
-  home = buildHome(plan, currentVersion(store.get()).items)
+  const version = currentVersion(store.get())
+  home = buildHome(plan, version.items, version.finishes)
   home.applyHidden(hiddenRooms)
   scene.add(home.group)
   // Make the new home match the screen now, not at the next frame: a click before that frame
@@ -130,6 +138,7 @@ const draw = (plan: Plan) => {
   itemControls.refresh()
   showClashes(plan, currentVersion(store.get()).items)
   openingControls.refresh()
+  home.highlightWall(highlightedWall)
 }
 
 // The scene redraws whenever the home changes.
@@ -213,7 +222,7 @@ const openingControls: OpeningControls = viewOnly
       },
     })
 const snapToggle = viewOnly ? null : mountSnapToggle(document.body)
-const roomPanel = viewOnly ? null : mountRoomPanel(document.body, store, focusRoom)
+const roomPanel = viewOnly ? null : mountRoomPanel(document.body, store, focusRoom, highlightWall)
 const itemControls: ItemControls = mountItemControls({
   surface: container,
   canvas: renderer.domElement,

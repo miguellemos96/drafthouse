@@ -1,12 +1,15 @@
-// Draws a plan and its items: one floor per room, the walls as boxes around their doors and windows,
+// Draws a plan and its items: one floor per room in its material and colour, the walls as boxes around their doors and windows,
 // a pane per window, a swing arc per door, and one group per item. Plan (x, y) maps to scene (x, z); +Y is up.
 // Clashing items are tinted red, and a blocked door's arc is drawn red and shown in every view (see src/model/clashes.ts).
+// Each face of a wall takes the colour the room on that side gives it (see src/model/finishes.ts).
 import * as THREE from 'three'
 import { wallFades } from '../model/fade.ts'
+import { DEFAULT_WALL_COLOUR, floorOf, wallFaceColours, wallKey, type Finishes, type Floor } from '../model/finishes.ts'
 import type { Item } from '../model/item.ts'
 import { openingsOf, spanOn, swingArc, wallOf, wallPieces, type WallPiece } from '../model/openings.ts'
-import { WALL_THICKNESS, wallLength, wallsOf, type Plan, type Wall } from '../model/plan.ts'
+import { WALL_THICKNESS, wallLength, wallsOf, type Plan, type Point, type Wall } from '../model/plan.ts'
 import { itemVisible, wallVisible, type HiddenRooms } from '../model/visibility.ts'
+import { floorTexture } from './floor-textures.ts'
 import { buildItem, tintClash } from './items.ts'
 
 export { WALL_THICKNESS }
@@ -16,6 +19,7 @@ const ARC_LIFT = 1 // cm above the floor, so the arc doesn't flicker against it
 const ARC_STEPS = 16
 const ARC_COLOUR = 0x2f80ed
 const BLOCKED_ARC_COLOUR = 0xe0242a
+const HIGHLIGHT = 0x2f80ed
 
 export type HomeView = {
   group: THREE.Group
@@ -37,13 +41,15 @@ export type HomeView = {
   applyFade: (camera: THREE.Vector3 | null) => void
   /** Hides the hidden rooms' floors, the walls only they border with their doors and windows, and the items inside them. */
   applyHidden: (hidden: HiddenRooms) => void
+  /** Tints every piece of the wall between `a` and `b`; `null` clears the tint. */
+  highlightWall: (wall: { a: Point; b: Point } | null) => void
 }
 
-const floorMesh = (corners: { x: number; y: number }[]) => {
+const floorMesh = (corners: { x: number; y: number }[], floor: Floor) => {
   const shape = new THREE.Shape(corners.map((p) => new THREE.Vector2(p.x, p.y)))
   const geometry = new THREE.ShapeGeometry(shape)
   geometry.rotateX(Math.PI / 2) // shape (x, y, 0) → scene (x, 0, y)
-  const material = new THREE.MeshStandardMaterial({ color: 0xd9c6a5, side: THREE.DoubleSide })
+  const material = new THREE.MeshStandardMaterial({ color: floor.colour, map: floorTexture(floor.material), side: THREE.DoubleSide })
   return new THREE.Mesh(geometry, material)
 }
 
@@ -58,14 +64,25 @@ const wallBox = (wall: Wall, from: number, to: number, bottom: number, top: numb
   return mesh
 }
 
-const wallMesh = (wall: Wall, piece: WallPiece) => {
+// The box's +z face is the wall's left face going from a to b in the plan, its -z face the right one. BoxGeometry
+// lists its faces +x, -x, +y, -y, +z, -z, four vertices each; the ends, top and bottom keep the default colour.
+const paintFaces = (geometry: THREE.BoxGeometry, { left, right }: { left: string; right: string }) => {
+  const faces = [DEFAULT_WALL_COLOUR, DEFAULT_WALL_COLOUR, DEFAULT_WALL_COLOUR, DEFAULT_WALL_COLOUR, left, right].map((c) => new THREE.Color(c))
+  const colours = new Float32Array(geometry.attributes.position.count * 3)
+  for (let v = 0; v < geometry.attributes.position.count; v++) faces[Math.floor(v / 4)].toArray(colours, v * 3)
+  geometry.setAttribute('color', new THREE.BufferAttribute(colours, 3))
+}
+
+const wallMesh = (wall: Wall, piece: WallPiece, faces: { left: string; right: string }) => {
   const length = wallLength(wall)
   // The pieces at the wall's ends reach half a thickness further, so neighbouring walls overlap at the
   // corners instead of leaving a notch.
   const from = piece.from === 0 ? -WALL_THICKNESS / 2 : piece.from
   const to = piece.to === length ? length + WALL_THICKNESS / 2 : piece.to
-  const material = new THREE.MeshStandardMaterial({ color: 0xf2efe9, transparent: true })
-  return wallBox(wall, from, to, piece.bottom, piece.top, material) as THREE.Mesh<THREE.BoxGeometry, THREE.MeshStandardMaterial>
+  const material = new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, transparent: true })
+  const mesh = wallBox(wall, from, to, piece.bottom, piece.top, material) as THREE.Mesh<THREE.BoxGeometry, THREE.MeshStandardMaterial>
+  paintFaces(mesh.geometry, faces)
+  return mesh
 }
 
 const arcObject = ({ centre, radius, startAngle, endAngle }: NonNullable<ReturnType<typeof swingArc>>) => {
@@ -91,15 +108,18 @@ const arcObject = ({ centre, radius, startAngle, endAngle }: NonNullable<ReturnT
   return group
 }
 
-export const buildHome = (plan: Plan, items: Item[] = []): HomeView => {
+export const buildHome = (plan: Plan, items: Item[] = [], finishes?: Finishes): HomeView => {
   const group = new THREE.Group()
   const floors = plan.rooms.map((room) => {
-    const mesh = floorMesh(room.corners)
+    const mesh = floorMesh(room.corners, floorOf(finishes, room.id))
     mesh.name = room.id
     return mesh
   })
   // wallPieces gives each piece its wall's height: the taller of the rooms it borders.
-  const walls = wallsOf(plan).flatMap((wall) => wallPieces(plan, wall).map((piece) => ({ wall, mesh: wallMesh(wall, piece), opening: piece.opening })))
+  const walls = wallsOf(plan).flatMap((wall) => {
+    const faces = wallFaceColours(plan, finishes, wall)
+    return wallPieces(plan, wall).map((piece) => ({ wall, mesh: wallMesh(wall, piece, faces), opening: piece.opening }))
+  })
   const panes: HomeView['panes'] = []
   const arcs: HomeView['arcs'] = []
   const wallOfOpening = new Map<string, Wall>()
@@ -157,5 +177,9 @@ export const buildHome = (plan: Plan, items: Item[] = []): HomeView => {
     items.forEach((item, i) => (itemGroups[i].visible = itemVisible(plan, item, hidden)))
     showArcs(arcsOn)
   }
-  return { group, floors, walls, panes, arcs, showArcs, showClashes, items: itemGroups, applyFade, applyHidden }
+  const highlightWall = (target: { a: Point; b: Point } | null) => {
+    const key = target && wallKey(target.a, target.b)
+    for (const { wall, mesh } of walls) mesh.material.emissive.setHex(key !== null && wallKey(wall.a, wall.b) === key ? HIGHLIGHT : 0x000000)
+  }
+  return { group, floors, walls, panes, arcs, showArcs, showClashes, items: itemGroups, applyFade, applyHidden, highlightWall }
 }
