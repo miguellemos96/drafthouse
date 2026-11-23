@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { en } from './en.ts'
 import {
   formatLength,
+  formatMoney,
   getLanguage,
   LANGUAGES,
   loadLanguage,
@@ -169,5 +170,34 @@ describe('formatLength', () => {
   it('uses the current language by default', () => {
     useLanguage('pt')
     expect(formatLength(210)).toBe('2,1 m')
+  })
+})
+
+describe('formatMoney', () => {
+  // Intl puts a no-break space between number and symbol in some languages.
+  const plain = (s: string) => s.replace(/\xa0|\u202f/g, ' ')
+
+  it('formats in the interface language with the currency code', () => {
+    expect(formatMoney(124900, 'EUR', {}, 'en')).toBe('€1,249.00')
+    expect(formatMoney(30000, 'GBP', {}, 'en')).toBe('£300.00')
+    expect(plain(formatMoney(49930, 'EUR', {}, 'es'))).toBe('499,30 €')
+    expect(formatMoney(49930, 'EUR', {}, 'pt')).toContain('499,30')
+  })
+
+  it('uses the current language by default', () => {
+    useLanguage('es')
+    expect(plain(formatMoney(49930, 'EUR'))).toBe('499,30 €')
+  })
+
+  it('shows a + on a gain when signed, and a minus on a loss', () => {
+    expect(formatMoney(20000, 'EUR', { signed: true }, 'en')).toBe('+€200.00')
+    expect(formatMoney(-4000, 'USD', { signed: true }, 'en')).toBe('-$40.00')
+    expect(formatMoney(0, 'EUR', { signed: true }, 'en')).toBe('€0.00')
+  })
+
+  it('shows a price with no currency, or an unknown code, as a plain number', () => {
+    expect(formatMoney(1000, '', {}, 'en')).toBe('10.00')
+    expect(formatMoney(1000, 'EU', {}, 'en')).toBe('10.00 EU')
+    expect(formatMoney(1000, 'EU', { signed: true }, 'en')).toBe('+10.00 EU')
   })
 })

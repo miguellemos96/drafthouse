@@ -80,3 +80,22 @@ export function formatLength(cm: number, lang: Language = current): string {
   const metres = new Intl.NumberFormat(lang, { maximumFractionDigits: 2, useGrouping: false }).format(whole / 100)
   return `${metres} m`
 }
+
+/**
+ * A sum of money in cents for display, in the interface language with its currency code:
+ * `€1,249.00` in English, `1249,00 €` in Spanish. With `signed`, a gain shows a `+`.
+ * An empty or unknown currency code shows the number with the code after it, if any.
+ */
+export function formatMoney(cents: number, currency: string, { signed = false }: { signed?: boolean } = {}, lang: Language = current): string {
+  const signDisplay = signed ? 'exceptZero' : 'auto'
+  const value = cents / 100
+  if (currency !== '') {
+    try {
+      return new Intl.NumberFormat(lang, { style: 'currency', currency, signDisplay }).format(value)
+    } catch {
+      // Not a currency Intl knows: fall through to a plain number.
+    }
+  }
+  const number = new Intl.NumberFormat(lang, { minimumFractionDigits: 2, maximumFractionDigits: 2, signDisplay }).format(value)
+  return currency === '' ? number : `${number} ${currency}`
+}
