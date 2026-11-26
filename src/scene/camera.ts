@@ -15,8 +15,8 @@ export type CameraRig = {
    * in the orbit view, straight down in the top view. Grabbing the view stops the move where it is.
    */
   focus: (frame: RoomFrame) => void
-  /** Steps a focus move; call once per frame, before `controls.update()`. */
-  update: (now?: number) => void
+  /** Steps a focus move; call once per frame, before `controls.update()`. True while the move goes on. */
+  update: (now?: number) => boolean
 }
 
 /** How long a focus move takes, in ms. */
@@ -79,12 +79,13 @@ export const createCameraRig = (dom: HTMLElement, home: THREE.Object3D): CameraR
   }
 
   const update = (now = performance.now()) => {
-    if (!move) return
+    if (!move) return false
     const t = Math.min(1, (now - move.start) / FOCUS_MS)
     const k = ease(t)
     camera.position.lerpVectors(move.from.position, move.to.position, k)
     controls.target.lerpVectors(move.from.target, move.to.target, k)
     if (t === 1) move = null
+    return move !== null
   }
   // The user takes over: stop where the camera is.
   controls.addEventListener('start', () => (move = null))

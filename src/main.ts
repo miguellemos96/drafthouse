@@ -24,6 +24,7 @@ import type { HiddenRooms } from './model/visibility.ts'
 import { createCameraRig, type CameraRig } from './scene/camera.ts'
 import { buildHome, type HomeView } from './scene/home.ts'
 import { createCornerHandles } from './scene/corner-handles.ts'
+import { createFrameScheduler } from './scene/frames.ts'
 import { createMeasureView, floorLine } from './scene/measures.ts'
 import { createSelectionView } from './scene/selection.ts'
 import { createSnapGuides } from './scene/snap-guides.ts'
@@ -77,6 +78,8 @@ declare global {
       clashing: () => { items: string[]; doors: string[] }
       /** Where a point in the home shows on the page, in client pixels. */
       toScreen: (x: number, y: number, z: number) => { x: number; y: number }
+      /** How many frames the view has drawn: it draws only when something changes. */
+      readonly frames: number
     }
   }
 }
@@ -96,6 +99,21 @@ const sun = new THREE.DirectionalLight(0xffffff, 1.2)
 sun.position.set(-300, 800, 500)
 scene.add(sun)
 
+/** One frame: what the view does each time it draws. True while the camera is still moving. */
+const frame = () => {
+  const focusing = rig.update()
+  const damping = controls.update()
+  // Looking straight down, every room is already open to view: nothing fades.
+  home.applyFade(rig.isTopView() ? null : camera.position)
+  home.showArcs(rig.isTopView())
+  renderer.render(scene, camera)
+  measures.update()
+  return focusing || damping
+}
+// The view draws only when the picture can have changed, not 60 times a second.
+const frames = createFrameScheduler(frame, (callback) => requestAnimationFrame(callback))
+const { requestRender } = frames
+
 let home: HomeView = buildHome(store.get().plan, currentVersion(store.get()).items, currentVersion(store.get()).finishes)
 scene.add(home.group)
 /** The rooms hidden from the rooms list: a view setting, never in the store. */
@@ -105,6 +123,7 @@ let highlightedWall: { a: Point; b: Point } | null = null
 const highlightWall = (wall: { a: Point; b: Point } | null) => {
   highlightedWall = wall
   home.highlightWall(wall)
+  requestRender()
 }
 
 /** The clashes among the items as last drawn or previewed: a warning only, never saved. */
@@ -141,13 +160,21 @@ const draw = (plan: Plan) => {
   home.highlightWall(highlightedWall)
 }
 
-// The scene redraws whenever the home changes.
-store.subscribe((next) => draw(next.plan))
+// The scene redraws whenever the home changes: the plan, the items, the version, undo and redo, import.
+store.subscribe((next) => {
+  draw(next.plan)
+  requestRender()
+})
 
 const rig = createCameraRig(renderer.domElement, home.group)
 const { camera, controls } = rig
+// The camera moved: orbit, pan, zoom, and each damped step after letting go.
+controls.addEventListener('change', requestRender)
 /** Moves the camera smoothly to frame a room. */
-const focusRoom = (room: Room) => rig.focus(frameRoom(room, camera.fov, camera.aspect))
+const focusRoom = (room: Room) => {
+  rig.focus(frameRoom(room, camera.fov, camera.aspect))
+  requestRender()
+}
 
 const itemPanel = mountItemPanel(document.body, store, {
   duplicate: () => itemControls.duplicateSelected(),
@@ -161,6 +188,7 @@ const tapeMeasure = mountTapeMeasure({ parent: document.body, surface: container
 /** Switches between the orbit view and the top view, and tells the tools that care. */
 const setTopView = (on: boolean) => {
   rig.setTopView(on)
+  requestRender()
   // Doors and windows are placed and dragged in the top view only, and rooms drawn there.
   if (!on) openingControls.deselect()
   openingControls.render()
@@ -267,6 +295,9 @@ window.drafthouse = {
   hiddenRoomIds: () => [...hiddenRooms],
   shownItemIds: () => home.items.filter((group) => group.visible).map((group) => group.name),
   clashing: () => ({ items: [...clashingItemIds(clashes)], doors: [...blockedDoorIds(clashes)] }),
+  get frames() {
+    return frames.count()
+  },
   toScreen: (x, y, z) => {
     const ndc = new THREE.Vector3(x, y, z).project(camera)
     const rect = renderer.domElement.getBoundingClientRect()
@@ -300,6 +331,7 @@ const roomsList = mountRoomsList({
   onChange: (hidden) => {
     hiddenRooms = hidden
     home.applyHidden(hidden)
+    requestRender()
     // What can't be seen can't stay selected.
     const item = itemControls.selectedId()
     if (item !== null && home.items.find((group) => group.name === item)?.visible === false) itemControls.clear()
@@ -319,6 +351,7 @@ for (const panel of panels) panel.render()
 mountLanguageSwitcher(document.body, () => {
   applyLanguage()
   for (const panel of panels) panel.render()
+  requestRender()
 })
 
 const resize = () => {
@@ -326,16 +359,14 @@ const resize = () => {
   renderer.setSize(w, h)
   camera.aspect = w / h
   camera.updateProjectionMatrix()
+  requestRender()
 }
 window.addEventListener('resize', resize)
 resize()
 
-renderer.setAnimationLoop(() => {
-  rig.update()
-  controls.update()
-  // Looking straight down, every room is already open to view: nothing fades.
-  home.applyFade(rig.isTopView() ? null : camera.position)
-  home.showArcs(rig.isTopView())
-  renderer.render(scene, camera)
-  measures.update()
-})
+// Input can change what the view shows: selection, rotate handles, drag previews, snap guides, door and window
+// previews, the tape measure, a wall row hovered in a panel. Listened to on the whole page, ahead of the tools.
+for (const type of ['pointerdown', 'pointermove', 'pointerup', 'pointercancel', 'wheel', 'keydown', 'keyup', 'click', 'dblclick', 'input', 'change']) {
+  window.addEventListener(type, requestRender, { capture: true, passive: true })
+}
+requestRender()
